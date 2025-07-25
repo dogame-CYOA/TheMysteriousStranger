@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 
-// Configuration - Your NFT address
-const REQUIRED_NFT_ADDRESS = '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc';
+// Configuration - Your NFT address (the actual mint address)
+const REQUIRED_NFT_ADDRESS = 'Dh6isVXwKrNNamLjzQbFXkBKPdiLk4hGJVjfft6ZooLJ';
 const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
 
 export default async function handler(req, res) {
