@@ -40,8 +40,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // Connect to Solana
-    const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    // Connect to Solana with better error handling
+    const connection = new Connection(SOLANA_RPC_URL, {
+      commitment: 'confirmed',
+      confirmTransactionInitialTimeout: 60000
+    });
 
     // Get all token accounts for the wallet
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -53,7 +56,7 @@ export default async function handler(req, res) {
 
     // Extract NFT mint addresses
     const ownedNFTs = [];
-    for (let account of tokenAccounts.value) {
+    for (const account of tokenAccounts.value) {
       const tokenAmount = account.account.data.parsed.info.tokenAmount;
       
       // NFTs typically have 0 decimals and amount of 1
@@ -86,6 +89,22 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('NFT verification error:', error);
+    
+    // Better error handling for different types of errors
+    if (error.message?.includes('Invalid public key')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid wallet address provided'
+      });
+    }
+    
+    if (error.message?.includes('Network request failed')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Solana network temporarily unavailable'
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       error: 'Internal server error during verification'
