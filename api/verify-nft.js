@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 
-// Configuration
-const REQUIRED_NFT_ADDRESS = 'Dh6isVXwKrNNamLjzQbFXk-BKPdiLK4hGJVjfft6ZooLJ';
+// Configuration - Your NFT address
+const REQUIRED_NFT_ADDRESS = '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc';
 const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
 
 export default async function handler(req, res) {
@@ -9,26 +9,26 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
+  
   try {
     const { walletAddress } = req.body;
-
+    
     if (!walletAddress) {
       return res.status(400).json({ 
         success: false, 
         error: 'Wallet address is required' 
       });
     }
-
+    
     // Validate wallet address format
     let walletPublicKey;
     try {
@@ -39,75 +39,110 @@ export default async function handler(req, res) {
         error: 'Invalid wallet address format' 
       });
     }
-
-    // Connect to Solana with better error handling
+    
+    // Connect to Solana
     const connection = new Connection(SOLANA_RPC_URL, {
       commitment: 'confirmed',
       confirmTransactionInitialTimeout: 60000
     });
-
-    // Get all token accounts for the wallet
+    
+    // Method 1: Get all token accounts (original method)
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
       walletPublicKey,
       {
         programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
       }
     );
-
-    // Extract NFT mint addresses
-    const ownedNFTs = [];
+    
+    // Extract all tokens (not just NFTs) for debugging
+    const allTokens = [];
+    const potentialNFTs = [];
+    
     for (const account of tokenAccounts.value) {
-      const tokenAmount = account.account.data.parsed.info.tokenAmount;
+      const tokenInfo = account.account.data.parsed.info;
+      const tokenAmount = tokenInfo.tokenAmount;
+      const mintAddress = tokenInfo.mint;
       
-      // NFTs typically have 0 decimals and amount of 1
+      allTokens.push({
+        mint: mintAddress,
+        amount: tokenAmount.uiAmount,
+        decimals: tokenAmount.decimals
+      });
+      
+      // Check different NFT criteria
       if (tokenAmount.decimals === 0 && tokenAmount.uiAmount === 1) {
-        const mintAddress = account.account.data.parsed.info.mint;
-        ownedNFTs.push(mintAddress);
+        potentialNFTs.push(mintAddress);
+      }
+      
+      // Also check for tokens with amount > 0 (some NFTs might have different criteria)
+      if (tokenAmount.uiAmount > 0) {
+        potentialNFTs.push(mintAddress);
       }
     }
-
-    // Check if required NFT is owned
-    const hasRequiredNFT = ownedNFTs.includes(REQUIRED_NFT_ADDRESS);
-
+    
+    // Method 2: Direct check for the specific NFT
+    let hasSpecificNFT = false;
+    try {
+      const specificTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+        walletPublicKey,
+        {
+          mint: new PublicKey(REQUIRED_NFT_ADDRESS)
+        }
+      );
+      
+      hasSpecificNFT = specificTokenAccounts.value.length > 0 && 
+                      specificTokenAccounts.value.some(account => 
+                        account.account.data.parsed.info.tokenAmount.uiAmount > 0
+                      );
+    } catch (error) {
+      console.log('Direct NFT check failed:', error.message);
+    }
+    
+    // Check if required NFT is owned using both methods
+    const hasRequiredNFT = potentialNFTs.includes(REQUIRED_NFT_ADDRESS) || hasSpecificNFT;
+    
     if (hasRequiredNFT) {
-      // Generate a session token (simple approach)
+      // Generate a session token
       const sessionToken = Buffer.from(`${walletAddress}-${Date.now()}`).toString('base64');
       
       return res.status(200).json({
         success: true,
         message: 'NFT ownership verified',
         sessionToken: sessionToken,
-        walletAddress: walletAddress
+        walletAddress: walletAddress,
+        debug: {
+          totalTokens: allTokens.length,
+          potentialNFTs: potentialNFTs.length,
+          hasSpecificNFT: hasSpecificNFT,
+          method: hasSpecificNFT ? 'direct_check' : 'token_scan'
+        }
       });
     } else {
       return res.status(403).json({
         success: false,
         error: 'Required NFT not found in wallet',
-        ownedCount: ownedNFTs.length
+        requiredNFT: REQUIRED_NFT_ADDRESS,
+        debug: {
+          totalTokensFound: allTokens.length,
+          potentialNFTsFound: potentialNFTs.length,
+          hasSpecificNFT: hasSpecificNFT,
+          // Show first 10 tokens for debugging (don't expose all for privacy)
+          sampleTokens: allTokens.slice(0, 10),
+          // Check if the required NFT is close to any found tokens
+          closestMatches: potentialNFTs.filter(nft => 
+            nft.substring(0, 10) === REQUIRED_NFT_ADDRESS.substring(0, 10)
+          )
+        }
       });
     }
-
+    
   } catch (error) {
     console.error('NFT verification error:', error);
     
-    // Better error handling for different types of errors
-    if (error.message?.includes('Invalid public key')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid wallet address provided'
-      });
-    }
-    
-    if (error.message?.includes('Network request failed')) {
-      return res.status(503).json({
-        success: false,
-        error: 'Solana network temporarily unavailable'
-      });
-    }
-    
     return res.status(500).json({
       success: false,
-      error: 'Internal server error during verification'
+      error: 'Internal server error during verification',
+      details: error.message
     });
   }
 }
