@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
     <title>The Mysterious Stranger - Adventure</title>
     <style>
         body {
@@ -244,6 +245,61 @@
         let isVerified = false;
         let sessionToken = null;
 
+        // Check if user has a valid session on page load
+        async function checkExistingSession() {
+            const token = localStorage.getItem('nft_session_token');
+            if (!token) return false;
+
+            try {
+                const response = await fetch('/api/verify-nft', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.valid) {
+                        isVerified = true;
+                        sessionToken = token;
+                        showScene(0);
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Session check failed:', error);
+            }
+
+            // Clean up invalid token
+            localStorage.removeItem('nft_session_token');
+            return false;
+        }
+
+        // Verify session before accessing any scene
+        async function verifySession() {
+            const token = localStorage.getItem('nft_session_token');
+            if (!token) return false;
+
+            try {
+                const response = await fetch('/api/verify-nft', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.valid;
+                }
+            } catch (error) {
+                console.error('Session verification failed:', error);
+            }
+
+            return false;
+        }
+
         async function verifyNFT() {
             const walletAddress = document.getElementById('walletAddress').value.trim();
             const messageDiv = document.getElementById('verificationMessage');
@@ -275,6 +331,10 @@
                 if (data.success) {
                     isVerified = true;
                     sessionToken = data.sessionToken;
+                    
+                    // Store session token securely
+                    localStorage.setItem('nft_session_token', sessionToken);
+                    
                     messageDiv.innerHTML = '<div class="success">NFT ownership verified! Welcome, adventurer.</div>';
                     
                     // Wait a moment then show the game
@@ -294,12 +354,18 @@
             }
         }
 
-        function showScene(num) {
-            // Check if user is verified (except for going back to verification)
-            if (!isVerified && num !== 'verification') {
-                document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
-                document.getElementById('verification').classList.add('active');
-                return;
+        async function showScene(num) {
+            // Always verify session before showing scenes (except verification page)
+            if (num !== 'verification') {
+                const sessionValid = await verifySession();
+                if (!sessionValid) {
+                    isVerified = false;
+                    sessionToken = null;
+                    localStorage.removeItem('nft_session_token');
+                    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+                    document.getElementById('verification').classList.add('active');
+                    return;
+                }
             }
 
             document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
@@ -350,6 +416,9 @@
 
         // Add Enter key support for wallet input
         document.addEventListener('DOMContentLoaded', function() {
+            // Check for existing session on page load
+            checkExistingSession();
+            
             document.getElementById('walletAddress').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     verifyNFT();
