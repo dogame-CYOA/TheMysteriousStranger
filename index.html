@@ -82,6 +82,11 @@
             background: #e6d8a8;
             color: #111;
         }
+        .choice-btn:disabled {
+            background: #666;
+            color: #999;
+            cursor: not-allowed;
+        }
         .restart-btn {
             background: #444;
             color: #f8f8e8;
@@ -104,6 +109,28 @@
         .scene.active {
             display: block;
         }
+        .wallet-input {
+            width: 80%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #444;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            background: #f8f8e8;
+        }
+        .loading {
+            color: #bfa76a;
+            font-style: italic;
+        }
+        .error {
+            color: #ff6b6b;
+            margin: 10px 0;
+        }
+        .success {
+            color: #51cf66;
+            margin: 10px 0;
+        }
         @media (max-width: 800px) {
             .game-frame { width: 99vw; }
             .artwork { height: 220px; }
@@ -112,8 +139,24 @@
 </head>
 <body>
     <div class="game-frame">
+        <!-- NFT Verification Scene -->
+        <div id="verification" class="scene active">
+            <div class="artwork-container">
+                <img src="SPEARMAN.JPG" alt="The Mysterious Stranger" class="artwork">
+            </div>
+            <div class="textbox" style="text-align:center;">
+                <h2 style="margin-top:0;">The Mysterious Stranger</h2>
+                <p>This adventure requires ownership of a specific NFT to play.</p>
+                <input type="text" id="walletAddress" class="wallet-input" placeholder="Enter your Solana wallet address" />
+                <div id="verificationMessage"></div>
+                <div class="choices-container" style="margin-top:24px;">
+                    <button class="choice-btn" onclick="verifyNFT()" id="verifyBtn">Verify NFT Ownership</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Page -->
-        <div id="scene0" class="scene active">
+        <div id="scene0" class="scene">
             <div class="artwork-container">
                 <img src="SPEARMAN.JPG" alt="The Mysterious Stranger" class="artwork">
             </div>
@@ -124,6 +167,7 @@
                 </div>
             </div>
         </div>
+        
         <!-- Scene 1 -->
         <div id="scene1" class="scene">
             <div class="artwork-container">
@@ -137,6 +181,7 @@
                 </div>
             </div>
         </div>
+        
         <!-- Scene 2 -->
         <div id="scene2" class="scene">
             <div class="artwork-container">
@@ -150,6 +195,7 @@
                 </div>
             </div>
         </div>
+        
         <!-- Scene 3 -->
         <div id="scene3" class="scene">
             <div class="artwork-container">
@@ -162,6 +208,7 @@
                 </div>
             </div>
         </div>
+        
         <!-- Scene 4 -->
         <div id="scene4" class="scene">
             <div class="artwork-container">
@@ -178,6 +225,7 @@
                 <div class="choices-container" id="scene4-extra" style="display:none;"></div>
             </div>
         </div>
+        
         <!-- Scene 5 -->
         <div id="scene5" class="scene">
             <div class="artwork-container">
@@ -191,10 +239,77 @@
             </div>
         </div>
     </div>
+
     <script>
+        let isVerified = false;
+        let sessionToken = null;
+
+        async function verifyNFT() {
+            const walletAddress = document.getElementById('walletAddress').value.trim();
+            const messageDiv = document.getElementById('verificationMessage');
+            const verifyBtn = document.getElementById('verifyBtn');
+            
+            if (!walletAddress) {
+                messageDiv.innerHTML = '<div class="error">Please enter a wallet address</div>';
+                return;
+            }
+
+            // Show loading state
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = 'Verifying...';
+            messageDiv.innerHTML = '<div class="loading">Checking NFT ownership...</div>';
+
+            try {
+                const response = await fetch('/api/verify-nft', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        walletAddress: walletAddress
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    isVerified = true;
+                    sessionToken = data.sessionToken;
+                    messageDiv.innerHTML = '<div class="success">NFT ownership verified! Welcome, adventurer.</div>';
+                    
+                    // Wait a moment then show the game
+                    setTimeout(() => {
+                        showScene(0);
+                    }, 2000);
+                } else {
+                    messageDiv.innerHTML = `<div class="error">Verification failed: ${data.error}</div>`;
+                    verifyBtn.disabled = false;
+                    verifyBtn.textContent = 'Verify NFT Ownership';
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                messageDiv.innerHTML = '<div class="error">Network error. Please try again.</div>';
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Verify NFT Ownership';
+            }
+        }
+
         function showScene(num) {
+            // Check if user is verified (except for going back to verification)
+            if (!isVerified && num !== 'verification') {
+                document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+                document.getElementById('verification').classList.add('active');
+                return;
+            }
+
             document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
-            document.getElementById('scene'+num).classList.add('active');
+            
+            if (num === 'verification') {
+                document.getElementById('verification').classList.add('active');
+            } else {
+                document.getElementById('scene'+num).classList.add('active');
+            }
+            
             // Reset scene 4 state every time you enter it
             if (num === 4) {
                 document.getElementById('scene4-text').innerText =
@@ -204,13 +319,16 @@
                 document.getElementById('scene4-extra').innerHTML = '';
             }
         }
+
         function restartStory() {
             showScene(0);
         }
+
         // Scene 4 logic
         function enterCave() {
             showScene(5);
         }
+
         function lookAround() {
             // 1/6 chance to hear noises and auto-advance
             const extra = document.getElementById('scene4-extra');
@@ -229,6 +347,15 @@
                 extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Unlock the door and go in</button>`;
             }
         }
+
+        // Add Enter key support for wallet input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('walletAddress').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    verifyNFT();
+                }
+            });
+        });
     </script>
 </body>
 </html>
