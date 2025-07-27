@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mysterious Stranger - Adventure</title>
+    <style>
+        body {
+            background: #222;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+        }
+        .game-frame {
+            background: #111;
+            border: 6px solid #bfa76a;
+            border-radius: 12px;
+            box-shadow: 0 0 32px #000a;
+            width: 700px;
+            max-width: 98vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 0 24px 0;
+        }
+        .artwork-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            border-bottom: 4px solid #bfa76a;
+            border-radius: 6px 6px 0 0;
+        }
+        .artwork {
+            width: 100%;
+            max-width: 680px;
+            height: 420px;
+            object-fit: contain;
+            background: #111;
+            display: block;
+        }
+        .textbox {
+            width: 92%;
+            margin: 0 auto;
+            margin-top: 18px;
+            background: #f8f8e8;
+            border: 3px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px #0003;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.18em;
+            color: #222;
+            padding: 18px 18px 10px 18px;
+            min-height: 90px;
+            position: relative;
+        }
+        .choices-container {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            align-items: center;
+        }
+        .choice-btn {
+            background: #bfa76a;
+            color: #222;
+            border: 2px solid #444;
+            padding: 10px 28px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.08em;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            box-shadow: 0 2px 8px #0002;
+        }
+        .choice-btn:hover {
+            background: #e6d8a8;
+            color: #111;
+        }
+        .choice-btn:disabled {
+            background: #666;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .restart-btn {
+            background: #444;
+            color: #f8f8e8;
+            border: 2px solid #bfa76a;
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 18px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .restart-btn:hover {
+            background: #bfa76a;
+            color: #222;
+        }
+        .scene {
+            display: none;
+        }
+        .scene.active {
+            display: block;
+        }
+        .loading {
+            color: #bfa76a;
+            font-style: italic;
+        }
+        .error {
+            color: #ff6b6b;
+            margin: 10px 0;
+        }
+        .success {
+            color: #51cf66;
+            margin: 10px 0;
+        }
+        .wallet-status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        .wallet-connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .wallet-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        @media (max-width: 800px) {
+            .game-frame { width: 99vw; }
+            .artwork { height: 220px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-frame">
+        <!-- Wallet Connection Scene -->
+        <div id="verification" class="scene active">
+            <div class="artwork-container">
+                <img src="SPEARMAN.JPG" alt="The Mysterious Stranger" class="artwork">
+            </div>
+            <div class="textbox" style="text-align:center;">
+                <h2 style="margin-top:0;">The Mysterious Stranger</h2>
+                <p>Connect your Solana wallet and prove ownership of the required NFT to access this exclusive adventure.</p>
+                
+                <div id="walletStatus" class="wallet-status wallet-disconnected">
+                    No wallet connected
+                </div>
+                
+                <div id="verificationMessage"></div>
+                
+                <div class="choices-container" style="margin-top:24px;">
+                    <button class="choice-btn" onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Page -->
+        <div id="scene0" class="scene">
+            <div class="artwork-container">
+                <img src="SPEARMAN.JPG" alt="The Mysterious Stranger" class="artwork">
+            </div>
+            <div class="textbox" style="text-align:center; font-size:1.5em;">
+                The Mysterious Stranger
+                <div class="choices-container" style="margin-top:24px;">
+                    <button class="choice-btn" onclick="showScene(1)">Begin</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 1 -->
+        <div id="scene1" class="scene">
+            <div class="artwork-container">
+                <img src="SPEARMAN.JPG" alt="A man with a spear in the distance" class="artwork">
+            </div>
+            <div class="textbox">
+                The sun is low as you walk the lonely road. In the distance you see a man standing still gripping a long spear. Something about his posture and the way the light glints off his weapon makes you pause. You feel a strange pull perhaps he knows something about the path ahead or maybe you just crave a break from solitude.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(2)">Approach the man</button>
+                    <button class="choice-btn" onclick="showScene(0)">Avoid him (but curiosity gnaws at you)</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 2 -->
+        <div id="scene2" class="scene">
+            <div class="artwork-container">
+                <img src="ZOOMMAN.JPG" alt="Zoomed in on the man" class="artwork">
+            </div>
+            <div class="textbox">
+                As you draw closer the man's features come into focus. He looks tired but determined. He raises his spear in greeting then asks "Traveler do you have a moment I need help with a task. If you assist me I promise a reward."
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(3)">Accept his request</button>
+                    <button class="choice-btn" onclick="showScene(0)">Say no (but something about his earnestness makes you reconsider)</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 3 -->
+        <div id="scene3" class="scene">
+            <div class="artwork-container">
+                <img src="REWARDKEY.JPG" alt="The man holding a key and a reward" class="artwork">
+            </div>
+            <div class="textbox">
+                The man smiles and reveals a small ornate key. "This key is needed to open the door on the mountain side to get my lost item. I cannot retrieve it alone. If you help me this key and a reward will be yours."
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(4)">Agree to help and head to the cave</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 4 -->
+        <div id="scene4" class="scene">
+            <div class="artwork-container">
+                <img src="CAVE.JPG" alt="Approaching the cave door" class="artwork">
+            </div>
+            <div class="textbox">
+                <span id="scene4-text">
+                You arrive at the mouth of the cave. The heavy wooden door is slightly ajar darkness yawning beyond. The air is thick with anticipation.
+                </span>
+                <div class="choices-container" id="scene4-choices">
+                    <button class="choice-btn" onclick="enterCave()">Go in</button>
+                    <button class="choice-btn" onclick="lookAround()">Look around to see if the coast is clear</button>
+                </div>
+                <div class="choices-container" id="scene4-extra" style="display:none;"></div>
+            </div>
+        </div>
+        
+        <!-- Scene 5 -->
+        <div id="scene5" class="scene">
+            <div class="artwork-container">
+                <img src="GOBLIN.JPG" alt="Attacked by goblins" class="artwork">
+            </div>
+            <div class="textbox">
+                As you step inside a shriek pierces the darkness. Goblins leap from the shadows brandishing crude weapons. There is no time to think only to fight.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="restartStory()">FIGHT</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL - will work both locally and when deployed
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:3000' 
+            : 'https://the-mysterious-stranger.vercel.app';
+            
+        // Security: Input validation
+        function sanitizeInput(input) {
+            if (typeof input !== 'string') return '';
+            return input.trim().replace(/[<>]/g, '');
+        }
+        
+        // Security: Validate wallet address format
+        function isValidWalletAddress(address) {
+            if (!address || typeof address !== 'string') return false;
+            return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address.trim());
+        }
+        
+        // Security: Secure session storage with encryption
+        function secureStore(key, value) {
+            try {
+                const encrypted = btoa(JSON.stringify(value));
+                sessionStorage.setItem(key, encrypted);
+            } catch (error) {
+                console.error('Failed to store session:', error);
+            }
+        }
+        
+        function secureRetrieve(key) {
+            try {
+                const encrypted = sessionStorage.getItem(key);
+                if (!encrypted) return null;
+                return JSON.parse(atob(encrypted));
+            } catch (error) {
+                console.error('Failed to retrieve session:', error);
+                return null;
+            }
+        }
+        
+        // Simple base58 encoding function
+        function base58Encode(bytes) {
+            const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+            let num = 0n;
+            for (let i = 0; i < bytes.length; i++) {
+                num = num * 256n + BigInt(bytes[i]);
+            }
+            let str = '';
+            while (num > 0n) {
+                str = alphabet[Number(num % 58n)] + str;
+                num = num / 58n;
+            }
+            // Handle leading zeros
+            for (let i = 0; i < bytes.length && bytes[i] === 0; i++) {
+                str = '1' + str;
+            }
+            return str;
+        }
+            
+        // Security: Request timestamp for anti-replay protection
+        function addTimestamp(body) {
+            return {
+                timestamp: Date.now().toString()
+            };
+        }
+        
+        // Security: Make timestamped API request
+        async function makeTimestampedRequest(url, body) {
+            const timestamp = Date.now().toString();
+            
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Request-Timestamp': timestamp
+                },
+                body: JSON.stringify(body)
+            });
+        }
+        
+        let isVerified = false;
+        let sessionToken = null;
+        let walletProvider = null;
+        let connectedWallet = null;
+
+        // Check if user has a valid session on page load
+        async function checkExistingSession() {
+            const sessionData = secureRetrieve('nft_session_token');
+            if (!sessionData || !sessionData.token) return false;
+            
+            const token = sessionData.token;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/verify-nft`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.valid) {
+                        isVerified = true;
+                        sessionToken = token;
+                        connectedWallet = data.walletAddress;
+                        updateWalletStatus(`Connected: ${data.walletAddress.substring(0, 8)}...`, true);
+                        showScene(0);
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Session check failed:', error);
+            }
+
+            localStorage.removeItem('nft_session_token');
+            return false;
+        }
+
+        // Update wallet connection status display
+        function updateWalletStatus(message, connected = false) {
+            const statusDiv = document.getElementById('walletStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `wallet-status ${connected ? 'wallet-connected' : 'wallet-disconnected'}`;
+        }
+
+        // Connect to Solana wallet
+        async function connectWallet() {
+            const connectBtn = document.getElementById('connectBtn');
+            const messageDiv = document.getElementById('verificationMessage');
+            
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            messageDiv.innerHTML = '<div class="loading">Looking for wallet...</div>';
+
+            try {
+                // Check if Phantom is installed
+                if (window.solana && window.solana.isPhantom) {
+                    walletProvider = window.solana;
+                } else {
+                    messageDiv.innerHTML = '<div class="error">Please install <a href="https://phantom.app/" target="_blank">Phantom Wallet</a> to continue.</div>';
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect Wallet';
+                    return;
+                }
+
+                // Connect to wallet
+                const response = await walletProvider.connect();
+                const rawWalletAddress = response.publicKey.toString();
+                
+                // Security: Validate wallet address
+                if (!isValidWalletAddress(rawWalletAddress)) {
+                    throw new Error('Invalid wallet address received from provider');
+                }
+                
+                connectedWallet = sanitizeInput(rawWalletAddress);
+                
+                updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}...`, true);
+                messageDiv.innerHTML = '<div class="loading">Wallet connected. Generating challenge...</div>';
+
+                // Step 1: Get challenge from server
+                const challengeResponse = await makeTimestampedRequest(`${API_BASE_URL}/api/verify-nft`, {
+                    action: 'challenge',
+                    walletAddress: connectedWallet
+                });
+
+                const challengeData = await challengeResponse.json();
+                if (!challengeData.success) {
+                    throw new Error(challengeData.error);
+                }
+
+                messageDiv.innerHTML = '<div class="loading">Please sign the message in your wallet to verify ownership...</div>';
+
+                // Step 2: Sign the challenge message
+                const encodedMessage = new TextEncoder().encode(challengeData.message);
+                const signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+
+                messageDiv.innerHTML = '<div class="loading">Verifying signature and checking NFT ownership...</div>';
+
+                // Handle different signature formats
+                let signatureToSend;
+                if (signedMessage.signature) {
+                    // Phantom returns {signature: Uint8Array, publicKey: PublicKey}
+                    if (signedMessage.signature instanceof Uint8Array) {
+                        // Convert Uint8Array to base58 using our custom function
+                        signatureToSend = base58Encode(signedMessage.signature);
+                    } else {
+                        signatureToSend = signedMessage.signature;
+                    }
+                } else {
+                    // Some wallets might return the signature directly  
+                    signatureToSend = signedMessage;
+                }
+
+                // Step 3: Verify signature and check NFT
+                const verifyResponse = await makeTimestampedRequest(`${API_BASE_URL}/api/verify-nft`, {
+                    action: 'verify',
+                    walletAddress: connectedWallet,
+                    signature: signatureToSend,
+                    challenge: challengeData.challenge
+                });
+
+                const verifyData = await verifyResponse.json();
+
+                if (verifyData.success) {
+                    isVerified = true;
+                    sessionToken = verifyData.sessionToken;
+                    
+                    // Security: Store session securely
+                    secureStore('nft_session_token', {
+                        token: sessionToken,
+                        wallet: connectedWallet.substring(0, 8) + '...',
+                        timestamp: Date.now()
+                    });
+                    
+                    messageDiv.innerHTML = '<div class="success">Wallet verified and NFT ownership confirmed! Welcome, adventurer.</div>';
+                    
+                    setTimeout(() => {
+                        showScene(0);
+                    }, 2000);
+                } else {
+                    messageDiv.innerHTML = `<div class="error">Verification failed: ${verifyData.error}</div>`;
+                    updateWalletStatus('Wallet connected but verification failed', false);
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Try Again';
+                }
+
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                if (error.message.includes('User rejected')) {
+                    messageDiv.innerHTML = '<div class="error">Wallet connection cancelled by user.</div>';
+                } else {
+                    messageDiv.innerHTML = `<div class="error">Connection failed: ${error.message}</div>`;
+                }
+                updateWalletStatus('Connection failed', false);
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Wallet';
+            }
+        }
+
+        // Verify session before accessing any scene
+        async function verifySession() {
+            const sessionData = secureRetrieve('nft_session_token');
+            if (!sessionData || !sessionData.token) return false;
+            
+            const token = sessionData.token;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/verify-nft`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.valid;
+                }
+            } catch (error) {
+                console.error('Session verification failed:', error);
+            }
+
+            return false;
+        }
+
+        async function showScene(num) {
+            // Always verify session before showing scenes (except verification page)
+            if (num !== 'verification') {
+                const sessionValid = await verifySession();
+                if (!sessionValid) {
+                    isVerified = false;
+                    sessionToken = null;
+                    connectedWallet = null;
+                    sessionStorage.removeItem('nft_session_token');
+                    updateWalletStatus('Session expired', false);
+                    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+                    document.getElementById('verification').classList.add('active');
+                    return;
+                }
+            }
+
+            document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+            
+            if (num === 'verification') {
+                document.getElementById('verification').classList.add('active');
+            } else {
+                document.getElementById('scene'+num).classList.add('active');
+            }
+            
+            // Reset scene 4 state every time you enter it
+            if (num === 4) {
+                document.getElementById('scene4-text').innerText =
+                    "You arrive at the mouth of the cave. The heavy wooden door is slightly ajar darkness yawning beyond. The air is thick with anticipation.";
+                document.getElementById('scene4-choices').style.display = '';
+                document.getElementById('scene4-extra').style.display = 'none';
+                document.getElementById('scene4-extra').innerHTML = '';
+            }
+        }
+
+        function restartStory() {
+            showScene(0);
+        }
+
+        // Scene 4 logic
+        function enterCave() {
+            showScene(5);
+        }
+
+        function lookAround() {
+            const extra = document.getElementById('scene4-extra');
+            extra.innerHTML = '';
+            if (Math.floor(Math.random()*6) === 0) {
+                document.getElementById('scene4-text').innerText =
+                    "You listen closely. Suddenly you hear shuffling and guttural whispers on the other side of the door. Before you can react the door bursts open.";
+                document.getElementById('scene4-choices').style.display = 'none';
+                extra.style.display = '';
+                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Sneak in and attack</button> <button class='choice-btn' onclick='showScene(0)'>This is too scary runaway</button>`;
+            } else {
+                document.getElementById('scene4-text').innerText =
+                    "You look around carefully. All seems quiet. Gathering your courage you decide to unlock the door and go in.";
+                document.getElementById('scene4-choices').style.display = 'none';
+                extra.style.display = '';
+                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Unlock the door and go in</button>`;
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkExistingSession();
+        });
+    </script>
+</body>
+</html>
