@@ -3,9 +3,7 @@
     "version": "1.0.0",
     "description": "NFT-gated adventure game with wallet connection verification",
     "scripts": {
-      "dev": "vercel dev",
-      "build": "echo 'Build complete'",
-      "start": "echo 'Server started'"
+      "dev": "vercel dev"
     },
     "dependencies": {
       "@solana/web3.js": "^1.87.6",
@@ -13,6 +11,6 @@
       "tweetnacl": "^1.0.3"
     },
     "engines": {
-      "node": "18.x"
+      "node": "22.x"
     }
   }
