@@ -245,7 +245,33 @@
             <div class="textbox">
                 As you step inside a shriek pierces the darkness. Goblins leap from the shadows brandishing crude weapons. There is no time to think only to fight.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="restartStory()">FIGHT</button>
+                    <button class="choice-btn" onclick="showScene(6)">FIGHT</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 6 - Victory Over Goblins -->
+        <div id="scene6" class="scene">
+            <div class="artwork-container">
+                <img src="GOBLIN.jpg" alt="Victory over goblins" class="artwork">
+            </div>
+            <div class="textbox">
+                With a swift and decisive strike, you deliver a fatal blow to one of the goblins. The other, seeing its companion fall, turns and flees into the darkness. You have successfully survived the encounter and proven your combat prowess.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(7)">Explore the cave further</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scene 7 - Treasure Chest -->
+        <div id="scene7" class="scene">
+            <div class="artwork-container">
+                <img src="TREASURE.jpg" alt="Treasure chest of gold" class="artwork">
+            </div>
+            <div class="textbox">
+                Venturing deeper into the cave, you discover a hidden chamber. In the flickering light, you spot a magnificent chest overflowing with gold coins and precious gems. The stranger's lost item was indeed valuable - this treasure could change your fortune forever.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="restartStory()">Claim the treasure and return to the stranger</button>
                 </div>
             </div>
         </div>
