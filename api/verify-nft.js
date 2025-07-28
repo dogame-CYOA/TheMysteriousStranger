@@ -4,7 +4,10 @@ import bs58 from 'bs58';
 import crypto from 'crypto';
 
 // Configuration
-const REQUIRED_NFT_ADDRESS = 'Dh6isVXwKrNNamLjzQbFXkBKPdiLk4hGJVjfft6ZooLJ';
+const REQUIRED_NFT_ADDRESSES = [
+  'Dh6isVXwKrNNamLjzQbFXkBKPdiLk4hGJVjfft6ZooLJ',
+  '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc'
+];
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const REQUEST_SIGNING_SECRET = process.env.REQUEST_SIGNING_SECRET || crypto.randomBytes(32).toString('hex');
@@ -331,40 +334,41 @@ export default async function handler(req, res) {
       // Security: Use proxy to check NFT ownership (hides Helius API key)
       try {
         console.log(`[${requestId}] Checking NFT ownership via proxy`);
-        const proxyUrl = `${req.headers.host ? `https://${req.headers.host}` : 'http://localhost:3000'}/api/proxy-nft-query`;
-        
-        const proxyResponse = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            walletAddress: cleanWalletAddress,
-            nftMintAddress: REQUIRED_NFT_ADDRESS,
-            sessionToken: 'temp'
-          })
-        });
-        
-        if (!proxyResponse.ok) {
-          console.error(`[${requestId}] Proxy response not ok: ${proxyResponse.status} ${proxyResponse.statusText}`);
-          throw new Error(`Proxy request failed: ${proxyResponse.status}`);
+        let hasRequiredNFT = false;
+        for (const mintAddress of REQUIRED_NFT_ADDRESSES) {
+          const proxyUrl = `${req.headers.host ? `https://${req.headers.host}` : 'http://localhost:3000'}/api/proxy-nft-query`;
+          const proxyResponse = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              walletAddress: cleanWalletAddress,
+              nftMintAddress: mintAddress,
+              sessionToken: 'temp'
+            })
+          });
+          if (!proxyResponse.ok) {
+            console.error(`[${requestId}] Proxy response not ok: ${proxyResponse.status} ${proxyResponse.statusText}`);
+            continue;
+          }
+          const responseText = await proxyResponse.text();
+          let proxyData;
+          try {
+            proxyData = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error(`[${requestId}] Failed to parse proxy response:`, responseText.substring(0, 200));
+            continue;
+          }
+          if (proxyData.success && proxyData.hasNFT) {
+            hasRequiredNFT = true;
+            break;
+          }
         }
-        
-        const responseText = await proxyResponse.text();
-        let proxyData;
-        
-        try {
-          proxyData = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error(`[${requestId}] Failed to parse proxy response:`, responseText.substring(0, 200));
-          throw new Error('Invalid response from proxy service');
-        }
-        
-        if (proxyData.success && proxyData.hasNFT) {
+        if (hasRequiredNFT) {
           // Generate secure session token
           const sessionToken = generateSecureToken(cleanWalletAddress);
           const expires = Date.now() + SESSION_DURATION;
-          
           // Store session
           activeSessions.set(sessionToken, {
             walletAddress: cleanWalletAddress,
@@ -372,9 +376,7 @@ export default async function handler(req, res) {
             expires,
             verified: true
           });
-          
           console.log(`[${requestId}] Wallet verified successfully: ${cleanWalletAddress.substring(0, 4)}...`);
-          
           return res.status(200).json({
             success: true,
             message: 'Wallet verified and NFT ownership confirmed',
