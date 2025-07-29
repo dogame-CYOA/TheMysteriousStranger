@@ -321,10 +321,10 @@ export default async function handler(req, res) {
           });
         }
       } catch (error) {
-        console.error(`[${requestId}] Signature verification error:`, error);
+        console.error(`[${requestId}] Signature verification error`);
         return res.status(401).json({
           success: false,
-          error: `Signature verification failed: ${error.message}`
+          error: 'Signature verification failed'
         });
       }
       
@@ -391,7 +391,7 @@ export default async function handler(req, res) {
           });
         }
       } catch (error) {
-        console.error(`[${requestId}] Proxy NFT verification error:`, error);
+        console.error(`[${requestId}] Proxy NFT verification error`);
         return res.status(500).json({
           success: false,
           error: 'Failed to verify NFT ownership'
