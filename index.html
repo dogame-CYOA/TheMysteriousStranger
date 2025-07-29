@@ -36,6 +36,8 @@
             border-bottom: 4px solid #bfa76a;
             border-radius: 6px 6px 0 0;
             min-height: 220px;
+            overflow: hidden;
+            position: relative;
         }
         .artwork {
             width: 100%;
@@ -45,8 +47,10 @@
             object-fit: contain;
             background: #111;
             display: block;
-            margin-left: auto;
-            margin-right: auto;
+            margin: 0 auto;
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
         }
         .textbox {
             width: 92%;
@@ -145,6 +149,18 @@
         @media (max-width: 800px) {
             .game-frame { width: 99vw; }
             .artwork { height: 220px; }
+        }
+        @media (max-width: 768px) {
+            .artwork {
+                max-width: 100%;
+                max-height: 300px;
+                width: auto;
+                height: auto;
+            }
+            .artwork-container {
+                min-height: 180px;
+                padding: 10px 0;
+            }
         }
     </style>
 </head>
@@ -474,42 +490,99 @@
                 let walletProvider = null;
                 let walletType = 'unknown';
                 
-                // Validate Solana object exists and has required methods
-                if (!window.solana || typeof window.solana !== 'object') {
-                    throw new Error('No Solana wallet detected');
+                // Debug: Log available wallet objects
+                console.log('Available wallet objects:', {
+                    solana: !!window.solana,
+                    solflare: !!window.solflare,
+                    backpack: !!window.backpack,
+                    phantom: !!window.phantom
+                });
+                
+                if (window.solana) {
+                    console.log('Solana wallet properties:', {
+                        isPhantom: window.solana.isPhantom,
+                        isSolflare: window.solana.isSolflare,
+                        isBackpack: window.solana.isBackpack,
+                        isSlope: window.solana.isSlope,
+                        isGlow: window.solana.isGlow,
+                        hasConnect: typeof window.solana.connect === 'function',
+                        hasSignMessage: typeof window.solana.signMessage === 'function'
+                    });
                 }
                 
-                // Security: Check for known wallet providers with proper validation
-                if (window.solana.isPhantom && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
-                    walletProvider = window.solana;
-                    walletType = 'Phantom';
-                    console.log('Found Phantom wallet');
-                } else if (window.solana.isSolflare && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
-                    walletProvider = window.solana;
-                    walletType = 'Solflare';
-                    console.log('Found Solflare wallet');
-                } else if (window.solana.isBackpack && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
-                    walletProvider = window.solana;
-                    walletType = 'Backpack';
-                    console.log('Found Backpack wallet');
-                } else if (window.solana.isSlope && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
-                    walletProvider = window.solana;
-                    walletType = 'Slope';
-                    console.log('Found Slope wallet');
-                } else if (window.solana.isGlow && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
-                    walletProvider = window.solana;
-                    walletType = 'Glow';
-                    console.log('Found Glow wallet');
-                } else {
-                    // Security: Only accept wallets with verified implementations
-                    messageDiv.innerHTML = '<div class="error">Unsupported wallet detected. Please use a supported Solana wallet like <a href="https://phantom.app/" target="_blank">Phantom</a>, <a href="https://solflare.com/" target="_blank">Solflare</a>, or <a href="https://backpack.app/" target="_blank">Backpack</a>.</div>';
+                // Enhanced wallet detection for different providers
+                if (window.solana) {
+                    // Phantom Wallet
+                    if (window.solana.isPhantom) {
+                        walletProvider = window.solana;
+                        walletType = 'Phantom';
+                        console.log('Found Phantom wallet');
+                    }
+                    // Solflare Wallet
+                    else if (window.solana.isSolflare) {
+                        walletProvider = window.solana;
+                        walletType = 'Solflare';
+                        console.log('Found Solflare wallet');
+                    }
+                    // Backpack Wallet
+                    else if (window.solana.isBackpack) {
+                        walletProvider = window.solana;
+                        walletType = 'Backpack';
+                        console.log('Found Backpack wallet');
+                    }
+                    // Slope Wallet
+                    else if (window.solana.isSlope) {
+                        walletProvider = window.solana;
+                        walletType = 'Slope';
+                        console.log('Found Slope wallet');
+                    }
+                    // Glow Wallet
+                    else if (window.solana.isGlow) {
+                        walletProvider = window.solana;
+                        walletType = 'Glow';
+                        console.log('Found Glow wallet');
+                    }
+                    // Generic Solana wallet (fallback)
+                    else if (typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
+                        walletProvider = window.solana;
+                        walletType = 'Solana';
+                        console.log('Found generic Solana wallet');
+                    }
+                }
+                
+                // Alternative detection methods for mobile wallets
+                if (!walletProvider) {
+                    // Check for mobile wallet providers
+                    if (window.solflare) {
+                        walletProvider = window.solflare;
+                        walletType = 'Solflare Mobile';
+                        console.log('Found Solflare mobile wallet');
+                    } else if (window.backpack) {
+                        walletProvider = window.backpack;
+                        walletType = 'Backpack Mobile';
+                        console.log('Found Backpack mobile wallet');
+                    } else if (window.phantom) {
+                        walletProvider = window.phantom;
+                        walletType = 'Phantom Mobile';
+                        console.log('Found Phantom mobile wallet');
+                    }
+                }
+                
+                if (!walletProvider) {
+                    console.log('No wallet provider found. Available objects:', Object.keys(window).filter(key => 
+                        key.toLowerCase().includes('solana') || 
+                        key.toLowerCase().includes('phantom') || 
+                        key.toLowerCase().includes('solflare') || 
+                        key.toLowerCase().includes('backpack')
+                    ));
+                    messageDiv.innerHTML = '<div class="error">No Solana wallet detected. Please install a supported wallet like <a href="https://phantom.app/" target="_blank">Phantom</a>, <a href="https://solflare.com/" target="_blank">Solflare</a>, or <a href="https://backpack.app/" target="_blank">Backpack</a>.</div>';
                     connectBtn.disabled = false;
                     connectBtn.textContent = 'Connect Wallet';
                     return;
                 }
 
                 // Security: Additional validation of wallet provider
-                if (!walletProvider || typeof walletProvider.connect !== 'function') {
+                if (typeof walletProvider.connect !== 'function') {
                     throw new Error('Invalid wallet provider detected');
                 }
 
