@@ -1,7 +1,10 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 
 // Configuration - API key is hidden from frontend
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY || 'efd72553-dd8e-4e57-8013-1f97536a9d7a';
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+if (!HELIUS_API_KEY) {
+  throw new Error('HELIUS_API_KEY environment variable is required');
+}
 const HELIUS_RPC_URL = `https://rpc.helius.xyz/?api-key=${HELIUS_API_KEY}`;
 
 // Security: Rate limiting
@@ -35,6 +38,17 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Security: Validate wallet address format
+function isValidWalletAddress(address) {
+  try {
+    new PublicKey(address);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Security: Rate limiting
 export default async function handler(req, res) {
   // Security: Restrict CORS to your domain only
   const allowedOrigins = [
@@ -98,59 +112,47 @@ export default async function handler(req, res) {
   }
   
   // Security: Validate wallet address format
-  try {
-    new PublicKey(walletAddress);
-    new PublicKey(nftMintAddress);
-  } catch (error) {
+  if (!isValidWalletAddress(walletAddress) || !isValidWalletAddress(nftMintAddress)) {
     console.log(`[${requestId}] Invalid wallet or NFT address format`);
     return res.status(400).json({
       success: false,
-      error: 'Invalid wallet or NFT address format'
+      error: 'Invalid address format'
     });
   }
   
   // Security: Rate limiting per wallet
-  if (!checkRateLimit(`wallet_${walletAddress}`)) {
+  if (!checkRateLimit(`proxy_wallet_${walletAddress}`)) {
     console.log(`[${requestId}] Rate limit exceeded for wallet: ${walletAddress.substring(0, 8)}...`);
     return res.status(429).json({
       success: false,
-      error: 'Too many requests for this wallet. Please try again later.'
+      error: 'Rate limit exceeded. Please try again later.'
     });
   }
   
   try {
     console.log(`[${requestId}] Querying NFT ownership for wallet: ${walletAddress.substring(0, 4)}...`);
-    console.log(`[${requestId}] Using Helius URL: ${HELIUS_RPC_URL.substring(0, 30)}...`);
+    // SECURITY: Don't log API URLs or internal details
     
     const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
-    
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
       new PublicKey(walletAddress),
-      {
-        mint: new PublicKey(nftMintAddress)
-      }
+      { mint: new PublicKey(nftMintAddress) }
     );
-    
-    const hasNFT = tokenAccounts.value.length > 0 && 
-                   tokenAccounts.value.some(account => 
+
+    const hasNFT = tokenAccounts.value.length > 0 &&
+                   tokenAccounts.value.some(account =>
                      account.account.data.parsed.info.tokenAmount.uiAmount > 0
                    );
-    
+
     console.log(`[${requestId}] NFT query result: ${hasNFT ? 'Found' : 'Not found'} for wallet: ${walletAddress.substring(0, 4)}...`);
     
-    return res.status(200).json({
-      success: true,
-      hasNFT: hasNFT,
-      tokenCount: hasNFT ? tokenAccounts.value.length : 0
-    });
-    
+    return res.status(200).json({ success: true, hasNFT });
   } catch (error) {
-    console.error(`[${requestId}] Proxy NFT query error:`, error.message);
-    console.error(`[${requestId}] Error stack:`, error.stack);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to query NFT ownership',
-      details: error.message
+    // SECURITY: Don't log error details or stack traces
+    console.error(`[${requestId}] Proxy NFT query error: ${error.name}`);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to query NFT ownership' 
     });
   }
-} 
+}
