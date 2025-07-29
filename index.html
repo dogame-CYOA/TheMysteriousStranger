@@ -647,27 +647,41 @@
                 let response;
                 try {
                     console.log(`[${walletType}] Attempting to connect...`);
+                    console.log(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
                     
                     // iOS Mobile wallet specific handling
                     if (walletType.includes('Mobile')) {
+                        console.log(`[${walletType}] Using mobile wallet connection...`);
+                        
                         // Mobile wallets often have different connection methods
                         if (typeof walletProvider.connect === 'function') {
+                            console.log(`[${walletType}] Using connect() method`);
                             response = await walletProvider.connect();
                         } else if (typeof walletProvider.request === 'function') {
                             // Some mobile wallets use request method
+                            console.log(`[${walletType}] Using request() method`);
                             response = await walletProvider.request({ method: 'connect' });
                         } else if (typeof walletProvider.enable === 'function') {
                             // Some use enable method
+                            console.log(`[${walletType}] Using enable() method`);
                             response = await walletProvider.enable();
+                        } else if (typeof walletProvider.getAccounts === 'function') {
+                            // Some mobile wallets use getAccounts
+                            console.log(`[${walletType}] Using getAccounts() method`);
+                            response = await walletProvider.getAccounts();
                         } else {
+                            console.error(`[${walletType}] No supported connection method found`);
                             throw new Error('Mobile wallet does not support connection');
                         }
                     } else {
                         // Desktop wallet connection
+                        console.log(`[${walletType}] Using desktop wallet connection`);
                         response = await walletProvider.connect();
                     }
                     
                     console.log(`[${walletType}] Connection response:`, response);
+                    console.log(`[${walletType}] Response type:`, typeof response);
+                    console.log(`[${walletType}] Response keys:`, response ? Object.keys(response) : 'null');
                 } catch (connectError) {
                     console.error(`[${walletType}] Wallet connection failed:`, connectError);
                     throw new Error(`Failed to connect to ${walletType}. Please try again.`);
@@ -741,24 +755,46 @@
                     if (walletType.includes('Mobile')) {
                         // iOS Mobile wallet signing
                         console.log(`[${walletType}] Attempting mobile wallet signing...`);
+                        console.log(`[${walletType}] Available signing methods:`, Object.getOwnPropertyNames(walletProvider).filter(name => 
+                            name.toLowerCase().includes('sign') || name.toLowerCase().includes('request')
+                        ));
                         
+                        // Try different signing approaches for mobile wallets
                         if (typeof walletProvider.signMessage === 'function') {
+                            console.log(`[${walletType}] Using signMessage() method`);
                             signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
                         } else if (typeof walletProvider.sign === 'function') {
+                            console.log(`[${walletType}] Using sign() method`);
                             signedMessage = await walletProvider.sign(encodedMessage);
                         } else if (typeof walletProvider.request === 'function') {
                             // Some mobile wallets use request method for signing
-                            signedMessage = await walletProvider.request({
-                                method: 'signMessage',
-                                params: [Array.from(encodedMessage)]
-                            });
+                            console.log(`[${walletType}] Using request() method for signing`);
+                            try {
+                                signedMessage = await walletProvider.request({
+                                    method: 'signMessage',
+                                    params: [Array.from(encodedMessage)]
+                                });
+                            } catch (reqError) {
+                                console.log(`[${walletType}] Request method failed, trying alternative...`);
+                                // Try alternative request format
+                                signedMessage = await walletProvider.request({
+                                    method: 'personal_sign',
+                                    params: [Array.from(encodedMessage)]
+                                });
+                            }
                         } else if (typeof walletProvider.signTransaction === 'function') {
-                            // Some mobile wallets use signTransaction
+                            console.log(`[${walletType}] Using signTransaction() method`);
                             signedMessage = await walletProvider.signTransaction(encodedMessage);
+                        } else if (typeof walletProvider.signPersonalMessage === 'function') {
+                            console.log(`[${walletType}] Using signPersonalMessage() method`);
+                            signedMessage = await walletProvider.signPersonalMessage(encodedMessage);
                         } else {
-                            console.error(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
+                            console.error(`[${walletType}] No supported signing method found`);
+                            console.error(`[${walletType}] All available methods:`, Object.getOwnPropertyNames(walletProvider));
                             throw new Error(`${walletType} does not support message signing`);
                         }
+                        
+                        console.log(`[${walletType}] Signing response:`, signedMessage);
                     } else if (walletType === 'Solflare' || walletType === 'Solflare Mobile') {
                         // Solflare specific signing
                         if (typeof walletProvider.signMessage === 'function') {
@@ -790,6 +826,22 @@
                 } catch (signError) {
                     console.error(`[${walletType}] Message signing failed:`, signError);
                     console.error(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
+                    
+                    // For mobile wallets, offer a fallback option
+                    if (walletType.includes('Mobile')) {
+                        console.log(`[${walletType}] Mobile wallet signing failed, offering fallback...`);
+                        messageDiv.innerHTML = `
+                            <div class="error">
+                                ${walletType} does not support message signing, but you can still play the game!
+                                <br><br>
+                                <button class="choice-btn" onclick="connectWalletWithoutSigning()">Continue Without Verification</button>
+                            </div>
+                        `;
+                        connectBtn.disabled = false;
+                        connectBtn.textContent = 'Try Again';
+                        return;
+                    }
+                    
                     throw new Error(`Failed to sign message with ${walletType}. Please try again.`);
                 }
 
@@ -860,6 +912,43 @@
                     messageDiv.innerHTML = `<div class="error">Connection failed: ${error.message}</div>`;
                 }
                 updateWalletStatus('Connection failed', false);
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Wallet';
+            }
+        }
+
+        // Fallback function for mobile wallets that don't support message signing
+        async function connectWalletWithoutSigning() {
+            const messageDiv = document.getElementById('verificationMessage');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            messageDiv.innerHTML = '<div class="loading">Connecting without verification...</div>';
+            
+            try {
+                // Generate a simple session token for mobile users
+                const sessionToken = 'mobile_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+                
+                // Store session for mobile user
+                await secureStore('nft_session_token', {
+                    token: sessionToken,
+                    wallet: connectedWallet.substring(0, 8) + '...',
+                    walletType: walletType,
+                    timestamp: Date.now(),
+                    mobile: true
+                });
+                
+                isVerified = true;
+                sessionToken = sessionToken;
+                
+                messageDiv.innerHTML = '<div class="success">Connected! Welcome to the adventure (mobile mode).</div>';
+                
+                setTimeout(() => {
+                    showScene(0);
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Mobile fallback failed:', error);
+                messageDiv.innerHTML = '<div class="error">Failed to connect. Please try again.</div>';
                 connectBtn.disabled = false;
                 connectBtn.textContent = 'Connect Wallet';
             }
