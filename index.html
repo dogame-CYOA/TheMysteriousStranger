@@ -40,17 +40,13 @@
             position: relative;
         }
         .artwork {
-            width: 100%;
-            max-width: 680px;
-            height: auto;
+            max-width: 100%;
             max-height: 420px;
+            width: auto;
+            height: auto;
             object-fit: contain;
             background: #111;
             display: block;
-            margin: 0 auto;
-            position: relative;
-            left: 50%;
-            transform: translateX(-50%);
         }
         .textbox {
             width: 92%;
@@ -152,14 +148,22 @@
         }
         @media (max-width: 768px) {
             .artwork {
-                max-width: 100%;
-                max-height: 300px;
-                width: auto;
-                height: auto;
+                max-width: 95%;
+                max-height: 280px;
+            }
+            .artwork-container {
+                min-height: 200px;
+                padding: 10px;
+            }
+        }
+        @media (max-width: 480px) {
+            .artwork {
+                max-width: 90%;
+                max-height: 240px;
             }
             .artwork-container {
                 min-height: 180px;
-                padding: 10px 0;
+                padding: 8px;
             }
         }
     </style>
@@ -586,9 +590,35 @@
                     throw new Error('Invalid wallet provider detected');
                 }
 
-                // Connect to wallet
-                const response = await walletProvider.connect();
-                const rawWalletAddress = response.publicKey.toString();
+                // Connect to wallet with wallet-specific handling
+                let response;
+                try {
+                    console.log(`[${walletType}] Attempting to connect...`);
+                    response = await walletProvider.connect();
+                    console.log(`[${walletType}] Connection response:`, response);
+                } catch (connectError) {
+                    console.error(`[${walletType}] Wallet connection failed:`, connectError);
+                    throw new Error(`Failed to connect to ${walletType}. Please try again.`);
+                }
+                
+                // Handle different response structures from different wallets
+                let rawWalletAddress;
+                if (response.publicKey) {
+                    // Standard response format (Phantom, most wallets)
+                    rawWalletAddress = response.publicKey.toString();
+                } else if (response.pubkey) {
+                    // Some wallets use 'pubkey' instead of 'publicKey'
+                    rawWalletAddress = response.pubkey.toString();
+                } else if (response.address) {
+                    // Some mobile wallets use 'address'
+                    rawWalletAddress = response.address;
+                } else if (typeof response === 'string') {
+                    // Some wallets return address directly as string
+                    rawWalletAddress = response;
+                } else {
+                    console.error('Unexpected wallet response format:', response);
+                    throw new Error(`Unexpected response format from ${walletType}`);
+                }
                 
                 // Security: Validate wallet address
                 if (!isValidWalletAddress(rawWalletAddress)) {
@@ -613,19 +643,42 @@
 
                 messageDiv.innerHTML = '<div class="loading">Please sign the message in your wallet to verify ownership...</div>';
 
-                // Step 2: Sign the challenge message with validated method
+                // Step 2: Sign the challenge message with wallet-specific handling
                 const encodedMessage = new TextEncoder().encode(challengeData.message);
                 let signedMessage;
                 
                 try {
-                    // Security: Use only the standard signMessage method for consistency
-                    if (typeof walletProvider.signMessage !== 'function') {
-                        throw new Error('Wallet does not support message signing');
+                    // Wallet-specific signing methods
+                    if (walletType === 'Solflare' || walletType === 'Solflare Mobile') {
+                        // Solflare specific signing
+                        if (typeof walletProvider.signMessage === 'function') {
+                            signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                        } else if (typeof walletProvider.sign === 'function') {
+                            signedMessage = await walletProvider.sign(encodedMessage);
+                        } else {
+                            throw new Error('Solflare wallet does not support message signing');
+                        }
+                    } else if (walletType === 'Backpack' || walletType === 'Backpack Mobile') {
+                        // Backpack specific signing
+                        if (typeof walletProvider.signMessage === 'function') {
+                            signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                        } else if (typeof walletProvider.sign === 'function') {
+                            signedMessage = await walletProvider.sign(encodedMessage);
+                        } else {
+                            throw new Error('Backpack wallet does not support message signing');
+                        }
+                    } else {
+                        // Generic signing for other wallets
+                        if (typeof walletProvider.signMessage === 'function') {
+                            signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                        } else if (typeof walletProvider.sign === 'function') {
+                            signedMessage = await walletProvider.sign(encodedMessage);
+                        } else {
+                            throw new Error('Wallet does not support message signing');
+                        }
                     }
-                    
-                    signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
                 } catch (signError) {
-                    console.error('Message signing failed');
+                    console.error('Message signing failed:', signError);
                     throw new Error(`Failed to sign message with ${walletType}. Please try again.`);
                 }
 
