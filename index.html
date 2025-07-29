@@ -499,50 +499,69 @@
         // Enhanced wallet detection function
         function detectWallet() {
             console.log('Detecting wallets...');
+            console.log('Available window objects:', Object.keys(window).filter(k => 
+                k.toLowerCase().includes('solana') || 
+                k.toLowerCase().includes('phantom') || 
+                k.toLowerCase().includes('solflare') || 
+                k.toLowerCase().includes('backpack')
+            ));
             
-            // Check for Phantom
-            if (window.solana && window.solana.isPhantom) {
-                console.log('Phantom wallet detected');
-                return { provider: window.solana, type: 'Phantom' };
-            }
-            
-            // Check for Solflare - try multiple detection methods
-            if (window.solflare) {
+            // Check for Solflare first (most specific)
+            if (window.solflare && typeof window.solflare.connect === 'function') {
                 console.log('Solflare wallet detected via window.solflare');
+                console.log('Solflare methods:', Object.getOwnPropertyNames(window.solflare));
                 return { provider: window.solflare, type: 'Solflare' };
             }
             
-            if (window.solana && window.solana.isSolflare) {
-                console.log('Solflare wallet detected via window.solana.isSolflare');
-                return { provider: window.solana, type: 'Solflare' };
-            }
-            
             // Check for Backpack
-            if (window.backpack) {
+            if (window.backpack && typeof window.backpack.connect === 'function') {
                 console.log('Backpack wallet detected via window.backpack');
+                console.log('Backpack methods:', Object.getOwnPropertyNames(window.backpack));
                 return { provider: window.backpack, type: 'Backpack' };
             }
             
-            if (window.solana && window.solana.isBackpack) {
-                console.log('Backpack wallet detected via window.solana.isBackpack');
-                return { provider: window.solana, type: 'Backpack' };
-            }
-            
-            // Check for other wallets
-            if (window.solana && window.solana.isSlope) {
-                console.log('Slope wallet detected');
-                return { provider: window.solana, type: 'Slope' };
-            }
-            
-            if (window.solana && window.solana.isGlow) {
-                console.log('Glow wallet detected');
-                return { provider: window.solana, type: 'Glow' };
-            }
-            
-            // Generic Solana wallet
-            if (window.solana && typeof window.solana.connect === 'function') {
-                console.log('Generic Solana wallet detected');
-                return { provider: window.solana, type: 'Solana' };
+            // Check window.solana for different wallet types
+            if (window.solana) {
+                console.log('window.solana found');
+                console.log('window.solana properties:', {
+                    isPhantom: window.solana.isPhantom,
+                    isSolflare: window.solana.isSolflare,
+                    isBackpack: window.solana.isBackpack,
+                    isSlope: window.solana.isSlope,
+                    isGlow: window.solana.isGlow
+                });
+                console.log('window.solana methods:', Object.getOwnPropertyNames(window.solana));
+                
+                if (window.solana.isPhantom) {
+                    console.log('Phantom wallet detected');
+                    return { provider: window.solana, type: 'Phantom' };
+                }
+                
+                if (window.solana.isSolflare) {
+                    console.log('Solflare wallet detected via window.solana.isSolflare');
+                    return { provider: window.solana, type: 'Solflare' };
+                }
+                
+                if (window.solana.isBackpack) {
+                    console.log('Backpack wallet detected via window.solana.isBackpack');
+                    return { provider: window.solana, type: 'Backpack' };
+                }
+                
+                if (window.solana.isSlope) {
+                    console.log('Slope wallet detected');
+                    return { provider: window.solana, type: 'Slope' };
+                }
+                
+                if (window.solana.isGlow) {
+                    console.log('Glow wallet detected');
+                    return { provider: window.solana, type: 'Glow' };
+                }
+                
+                // Generic Solana wallet
+                if (typeof window.solana.connect === 'function') {
+                    console.log('Generic Solana wallet detected');
+                    return { provider: window.solana, type: 'Solana' };
+                }
             }
             
             console.log('No wallet detected');
@@ -555,97 +574,121 @@
             const encodedMessage = new TextEncoder().encode(message);
             
             console.log(`[${type}] Attempting to sign message...`);
+            console.log(`[${type}] Message to sign:`, message);
+            console.log(`[${type}] Encoded message:`, encodedMessage);
             console.log(`[${type}] Available methods:`, Object.getOwnPropertyNames(provider));
             
             try {
-                let signature;
+                let signResult;
                 
-                switch (type) {
-                    case 'Phantom':
-                        // Phantom uses standard signMessage
-                        if (typeof provider.signMessage === 'function') {
-                            const result = await provider.signMessage(encodedMessage, 'utf8');
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Phantom wallet does not support message signing');
-                        }
-                        break;
-                        
-                    case 'Solflare':
-                        // Solflare has different signing methods
-                        if (typeof provider.signMessage === 'function') {
+                if (type === 'Solflare') {
+                    console.log(`[${type}] Using Solflare-specific signing...`);
+                    
+                    // Solflare has very specific requirements
+                    if (typeof provider.signMessage === 'function') {
+                        try {
+                            console.log(`[${type}] Trying signMessage with Uint8Array...`);
+                            signResult = await provider.signMessage(encodedMessage);
+                            console.log(`[${type}] signMessage result:`, signResult);
+                        } catch (error1) {
+                            console.log(`[${type}] First attempt failed:`, error1.message);
                             try {
-                                // Try the standard method first
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] Standard signMessage failed, trying alternative...`);
-                                // Try alternative method
-                                const result = await provider.signMessage(encodedMessage);
-                                signature = result.signature;
+                                console.log(`[${type}] Trying signMessage with string...`);
+                                signResult = await provider.signMessage(message);
+                                console.log(`[${type}] signMessage with string result:`, signResult);
+                            } catch (error2) {
+                                console.log(`[${type}] Second attempt failed:`, error2.message);
+                                throw new Error(`Solflare signMessage failed: ${error2.message}`);
                             }
-                        } else if (typeof provider.sign === 'function') {
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Solflare wallet does not support message signing');
                         }
-                        break;
-                        
-                    case 'Backpack':
-                        // Backpack signing
-                        if (typeof provider.signMessage === 'function') {
+                    } else {
+                        throw new Error('Solflare wallet does not have signMessage method');
+                    }
+                } else if (type === 'Backpack') {
+                    console.log(`[${type}] Using Backpack-specific signing...`);
+                    
+                    if (typeof provider.signMessage === 'function') {
+                        try {
+                            console.log(`[${type}] Trying signMessage with Uint8Array...`);
+                            signResult = await provider.signMessage(encodedMessage);
+                            console.log(`[${type}] signMessage result:`, signResult);
+                        } catch (error1) {
+                            console.log(`[${type}] First attempt failed:`, error1.message);
                             try {
-                                // Try with encoding parameter
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] UTF8 encoding failed, trying without...`);
-                                // Try without encoding parameter
-                                const result = await provider.signMessage(encodedMessage);
-                                signature = result.signature;
+                                console.log(`[${type}] Trying signMessage with string...`);
+                                signResult = await provider.signMessage(message);
+                                console.log(`[${type}] signMessage with string result:`, signResult);
+                            } catch (error2) {
+                                console.log(`[${type}] Second attempt failed:`, error2.message);
+                                throw new Error(`Backpack signMessage failed: ${error2.message}`);
                             }
-                        } else if (typeof provider.sign === 'function') {
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Backpack wallet does not support message signing');
                         }
-                        break;
-                        
-                    case 'Slope':
-                    case 'Glow':
-                    case 'Solana':
-                    default:
-                        // Generic signing approach
-                        if (typeof provider.signMessage === 'function') {
-                            try {
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] UTF8 encoding failed, trying without...`);
-                                const result = await provider.signMessage(encodedMessage);
-                                signature = result.signature;
-                            }
-                        } else if (typeof provider.sign === 'function') {
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error(`${type} wallet does not support message signing`);
-                        }
-                        break;
-                }
-                
-                console.log(`[${type}] Signing successful:`, signature);
-                
-                // Convert signature to base58 if it's a Uint8Array
-                if (signature instanceof Uint8Array) {
-                    return base58Encode(signature);
-                } else if (typeof signature === 'string') {
-                    return signature;
+                    } else {
+                        throw new Error('Backpack wallet does not have signMessage method');
+                    }
                 } else {
-                    throw new Error(`Unsupported signature format from ${type}`);
+                    // Phantom and other wallets
+                    console.log(`[${type}] Using standard signing...`);
+                    
+                    if (typeof provider.signMessage === 'function') {
+                        try {
+                            console.log(`[${type}] Trying signMessage with standard parameters...`);
+                            signResult = await provider.signMessage(encodedMessage, 'utf8');
+                            console.log(`[${type}] signMessage result:`, signResult);
+                        } catch (error1) {
+                            console.log(`[${type}] UTF8 method failed:`, error1.message);
+                            try {
+                                console.log(`[${type}] Trying signMessage without encoding...`);
+                                signResult = await provider.signMessage(encodedMessage);
+                                console.log(`[${type}] signMessage without encoding result:`, signResult);
+                            } catch (error2) {
+                                console.log(`[${type}] Standard method failed:`, error2.message);
+                                throw new Error(`${type} signMessage failed: ${error2.message}`);
+                            }
+                        }
+                    } else {
+                        throw new Error(`${type} wallet does not have signMessage method`);
+                    }
                 }
+                
+                console.log(`[${type}] Full signing result:`, signResult);
+                console.log(`[${type}] Result type:`, typeof signResult);
+                console.log(`[${type}] Result keys:`, signResult ? Object.keys(signResult) : 'null');
+                
+                // Extract signature from result
+                let signature;
+                if (signResult && signResult.signature) {
+                    signature = signResult.signature;
+                    console.log(`[${type}] Found signature in result.signature:`, signature);
+                } else if (signResult && signResult.data) {
+                    signature = signResult.data;
+                    console.log(`[${type}] Found signature in result.data:`, signature);
+                } else if (signResult && typeof signResult === 'object' && signResult.constructor === Uint8Array) {
+                    signature = signResult;
+                    console.log(`[${type}] Result is directly a Uint8Array:`, signature);
+                } else if (typeof signResult === 'string') {
+                    signature = signResult;
+                    console.log(`[${type}] Result is directly a string:`, signature);
+                } else {
+                    console.error(`[${type}] Unexpected signature format:`, signResult);
+                    throw new Error(`Unexpected signature format from ${type}`);
+                }
+                
+                // Convert signature to base58 string if needed
+                let finalSignature;
+                if (signature instanceof Uint8Array) {
+                    finalSignature = base58Encode(signature);
+                    console.log(`[${type}] Converted Uint8Array to base58:`, finalSignature);
+                } else if (typeof signature === 'string') {
+                    finalSignature = signature;
+                    console.log(`[${type}] Using string signature directly:`, finalSignature);
+                } else {
+                    console.error(`[${type}] Cannot process signature type:`, typeof signature, signature);
+                    throw new Error(`Cannot process signature from ${type}`);
+                }
+                
+                console.log(`[${type}] Final signature:`, finalSignature);
+                return finalSignature;
                 
             } catch (error) {
                 console.error(`[${type}] Signing failed:`, error);
@@ -691,22 +734,66 @@
                 
                 // Extract wallet address from response
                 let rawWalletAddress;
-                if (response.publicKey) {
-                    rawWalletAddress = response.publicKey.toString();
-                } else if (response.pubkey) {
+                console.log(`[${type}] Full connection response:`, response);
+                console.log(`[${type}] Response type:`, typeof response);
+                console.log(`[${type}] Response constructor:`, response ? response.constructor.name : 'null');
+                console.log(`[${type}] Response keys:`, response ? Object.keys(response) : 'null');
+                
+                if (response && response.publicKey) {
+                    console.log(`[${type}] Found publicKey:`, response.publicKey);
+                    if (typeof response.publicKey.toString === 'function') {
+                        rawWalletAddress = response.publicKey.toString();
+                    } else {
+                        rawWalletAddress = response.publicKey;
+                    }
+                } else if (response && response.pubkey) {
+                    console.log(`[${type}] Found pubkey:`, response.pubkey);
                     rawWalletAddress = response.pubkey.toString();
-                } else if (response.address) {
+                } else if (response && response.address) {
+                    console.log(`[${type}] Found address:`, response.address);
                     rawWalletAddress = response.address;
-                } else if (response.account) {
+                } else if (response && response.account) {
+                    console.log(`[${type}] Found account:`, response.account);
                     rawWalletAddress = response.account;
-                } else if (response.accounts && response.accounts[0]) {
+                } else if (response && response.accounts && response.accounts[0]) {
+                    console.log(`[${type}] Found accounts[0]:`, response.accounts[0]);
                     rawWalletAddress = response.accounts[0];
                 } else if (typeof response === 'string') {
+                    console.log(`[${type}] Response is string:`, response);
                     rawWalletAddress = response;
+                } else if (response && typeof response === 'object') {
+                    // Debug: log all properties to find the address
+                    console.log(`[${type}] Searching for address in response properties:`);
+                    for (const [key, value] of Object.entries(response)) {
+                        console.log(`[${type}] ${key}:`, value, typeof value);
+                        if (typeof value === 'string' && value.length > 30 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(value)) {
+                            console.log(`[${type}] Found potential address in ${key}:`, value);
+                            rawWalletAddress = value;
+                            break;
+                        } else if (value && typeof value === 'object' && typeof value.toString === 'function') {
+                            try {
+                                const stringValue = value.toString();
+                                if (stringValue.length > 30 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(stringValue)) {
+                                    console.log(`[${type}] Found potential address by toString() in ${key}:`, stringValue);
+                                    rawWalletAddress = stringValue;
+                                    break;
+                                }
+                            } catch (e) {
+                                console.log(`[${type}] Could not toString() ${key}:`, e.message);
+                            }
+                        }
+                    }
+                    
+                    if (!rawWalletAddress) {
+                        console.error(`[${type}] Could not find wallet address in response:`, response);
+                        throw new Error(`Could not extract wallet address from ${type} response`);
+                    }
                 } else {
-                    console.error('Unexpected wallet response format:', response);
+                    console.error(`[${type}] Unexpected wallet response format:`, response);
                     throw new Error(`Unexpected response format from ${type}`);
                 }
+                
+                console.log(`[${type}] Raw wallet address:`, rawWalletAddress);
                 
                 // Validate wallet address
                 if (!isValidWalletAddress(rawWalletAddress)) {
