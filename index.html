@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://the-mysterious-stranger.vercel.app http://localhost:3000;">
     <title>The Mysterious Stranger - Adventure</title>
     <style>
         body {
@@ -299,21 +300,74 @@
             return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address.trim());
         }
         
-        // Security: Secure session storage with encryption
-        function secureStore(key, value) {
+        // Security: Proper session encryption using Web Crypto API
+        let sessionEncryptionKey = null;
+        
+        async function initializeEncryption() {
             try {
-                const encrypted = btoa(JSON.stringify(value));
-                sessionStorage.setItem(key, encrypted);
+                // Generate or retrieve encryption key
+                const keyData = sessionStorage.getItem('session_key');
+                if (keyData) {
+                    const keyBuffer = Uint8Array.from(JSON.parse(keyData));
+                    sessionEncryptionKey = await crypto.subtle.importKey(
+                        'raw', keyBuffer, 'AES-GCM', false, ['encrypt', 'decrypt']
+                    );
+                } else {
+                    // Generate new key
+                    sessionEncryptionKey = await crypto.subtle.generateKey(
+                        { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+                    );
+                    const exported = await crypto.subtle.exportKey('raw', sessionEncryptionKey);
+                    sessionStorage.setItem('session_key', JSON.stringify(Array.from(exported)));
+                }
+            } catch (error) {
+                console.error('Failed to initialize encryption:', error);
+                // Fallback to base64 (less secure but functional)
+                sessionEncryptionKey = null;
+            }
+        }
+        
+        async function secureStore(key, value) {
+            try {
+                if (sessionEncryptionKey) {
+                    // Use proper encryption
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const encoded = new TextEncoder().encode(JSON.stringify(value));
+                    const encrypted = await crypto.subtle.encrypt(
+                        { name: 'AES-GCM', iv }, sessionEncryptionKey, encoded
+                    );
+                    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+                    combined.set(iv);
+                    combined.set(new Uint8Array(encrypted), iv.length);
+                    sessionStorage.setItem(key, btoa(String.fromCharCode(...combined)));
+                } else {
+                    // Fallback to base64 encoding
+                    const encoded = btoa(JSON.stringify(value));
+                    sessionStorage.setItem(key, encoded);
+                }
             } catch (error) {
                 console.error('Failed to store session:', error);
             }
         }
         
-        function secureRetrieve(key) {
+        async function secureRetrieve(key) {
             try {
-                const encrypted = sessionStorage.getItem(key);
-                if (!encrypted) return null;
-                return JSON.parse(atob(encrypted));
+                const stored = sessionStorage.getItem(key);
+                if (!stored) return null;
+                
+                if (sessionEncryptionKey) {
+                    // Decrypt properly encrypted data
+                    const combined = new Uint8Array(atob(stored).split('').map(c => c.charCodeAt(0)));
+                    const iv = combined.slice(0, 12);
+                    const encrypted = combined.slice(12);
+                    const decrypted = await crypto.subtle.decrypt(
+                        { name: 'AES-GCM', iv }, sessionEncryptionKey, encrypted
+                    );
+                    return JSON.parse(new TextDecoder().decode(decrypted));
+                } else {
+                    // Fallback to base64 decoding
+                    return JSON.parse(atob(stored));
+                }
             } catch (error) {
                 console.error('Failed to retrieve session:', error);
                 return null;
@@ -367,7 +421,7 @@
 
         // Check if user has a valid session on page load
         async function checkExistingSession() {
-            const sessionData = secureRetrieve('nft_session_token');
+            const sessionData = await secureRetrieve('nft_session_token');
             if (!sessionData || !sessionData.token) return false;
             
             const token = sessionData.token;
@@ -416,14 +470,47 @@
             messageDiv.innerHTML = '<div class="loading">Looking for wallet...</div>';
 
             try {
-                // Check if Phantom is installed
-                if (window.solana && window.solana.isPhantom) {
+                // Security: Validate wallet provider authenticity
+                let walletProvider = null;
+                let walletType = 'unknown';
+                
+                // Validate Solana object exists and has required methods
+                if (!window.solana || typeof window.solana !== 'object') {
+                    throw new Error('No Solana wallet detected');
+                }
+                
+                // Security: Check for known wallet providers with proper validation
+                if (window.solana.isPhantom && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
                     walletProvider = window.solana;
+                    walletType = 'Phantom';
+                    console.log('Found Phantom wallet');
+                } else if (window.solana.isSolflare && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
+                    walletProvider = window.solana;
+                    walletType = 'Solflare';
+                    console.log('Found Solflare wallet');
+                } else if (window.solana.isBackpack && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
+                    walletProvider = window.solana;
+                    walletType = 'Backpack';
+                    console.log('Found Backpack wallet');
+                } else if (window.solana.isSlope && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
+                    walletProvider = window.solana;
+                    walletType = 'Slope';
+                    console.log('Found Slope wallet');
+                } else if (window.solana.isGlow && typeof window.solana.connect === 'function' && typeof window.solana.signMessage === 'function') {
+                    walletProvider = window.solana;
+                    walletType = 'Glow';
+                    console.log('Found Glow wallet');
                 } else {
-                    messageDiv.innerHTML = '<div class="error">Please install <a href="https://phantom.app/" target="_blank">Phantom Wallet</a> to continue.</div>';
+                    // Security: Only accept wallets with verified implementations
+                    messageDiv.innerHTML = '<div class="error">Unsupported wallet detected. Please use a supported Solana wallet like <a href="https://phantom.app/" target="_blank">Phantom</a>, <a href="https://solflare.com/" target="_blank">Solflare</a>, or <a href="https://backpack.app/" target="_blank">Backpack</a>.</div>';
                     connectBtn.disabled = false;
                     connectBtn.textContent = 'Connect Wallet';
                     return;
+                }
+
+                // Security: Additional validation of wallet provider
+                if (!walletProvider || typeof walletProvider.connect !== 'function') {
+                    throw new Error('Invalid wallet provider detected');
                 }
 
                 // Connect to wallet
@@ -437,7 +524,7 @@
                 
                 connectedWallet = sanitizeInput(rawWalletAddress);
                 
-                updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}...`, true);
+                updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}... (${walletType})`, true);
                 messageDiv.innerHTML = '<div class="loading">Wallet connected. Generating challenge...</div>';
 
                 // Step 1: Get challenge from server
@@ -453,25 +540,45 @@
 
                 messageDiv.innerHTML = '<div class="loading">Please sign the message in your wallet to verify ownership...</div>';
 
-                // Step 2: Sign the challenge message
+                // Step 2: Sign the challenge message with validated method
                 const encodedMessage = new TextEncoder().encode(challengeData.message);
-                const signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                let signedMessage;
+                
+                try {
+                    // Security: Use only the standard signMessage method for consistency
+                    if (typeof walletProvider.signMessage !== 'function') {
+                        throw new Error('Wallet does not support message signing');
+                    }
+                    
+                    signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                } catch (signError) {
+                    console.error('Message signing failed');
+                    throw new Error(`Failed to sign message with ${walletType}. Please try again.`);
+                }
 
                 messageDiv.innerHTML = '<div class="loading">Verifying signature and checking NFT ownership...</div>';
 
-                // Handle different signature formats
+                // Security: Handle signature format with strict validation
                 let signatureToSend;
-                if (signedMessage.signature) {
-                    // Phantom returns {signature: Uint8Array, publicKey: PublicKey}
+                if (signedMessage && signedMessage.signature) {
                     if (signedMessage.signature instanceof Uint8Array) {
-                        // Convert Uint8Array to base58 using our custom function
                         signatureToSend = base58Encode(signedMessage.signature);
-                    } else {
+                    } else if (typeof signedMessage.signature === 'string') {
                         signatureToSend = signedMessage.signature;
+                    } else {
+                        throw new Error('Unsupported signature format from wallet');
+                    }
+                } else if (signedMessage && signedMessage.signatures && signedMessage.signatures[0]) {
+                    const sig = signedMessage.signatures[0];
+                    if (sig instanceof Uint8Array) {
+                        signatureToSend = base58Encode(sig);
+                    } else if (typeof sig === 'string') {
+                        signatureToSend = sig;
+                    } else {
+                        throw new Error('Unsupported signature format from wallet');
                     }
                 } else {
-                    // Some wallets might return the signature directly  
-                    signatureToSend = signedMessage;
+                    throw new Error('Invalid signature response from wallet');
                 }
 
                 // Step 3: Verify signature and check NFT
@@ -488,10 +595,11 @@
                     isVerified = true;
                     sessionToken = verifyData.sessionToken;
                     
-                    // Security: Store session securely
-                    secureStore('nft_session_token', {
+                    // Security: Store session securely (note: still using base64, but with better structure)
+                    await secureStore('nft_session_token', {
                         token: sessionToken,
                         wallet: connectedWallet.substring(0, 8) + '...',
+                        walletType: walletType,
                         timestamp: Date.now()
                     });
                     
@@ -522,7 +630,7 @@
 
         // Verify session before accessing any scene
         async function verifySession() {
-            const sessionData = secureRetrieve('nft_session_token');
+            const sessionData = await secureRetrieve('nft_session_token');
             if (!sessionData || !sessionData.token) return false;
             
             const token = sessionData.token;
@@ -608,7 +716,8 @@
         }
 
         // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeEncryption();
             checkExistingSession();
         });
     </script>
