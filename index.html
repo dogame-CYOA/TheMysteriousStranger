@@ -828,7 +828,7 @@
                     console.error(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
                     
                     // For mobile wallets, offer a fallback option
-                    if (walletType.includes('Mobile')) {
+                    if (walletType.includes('Mobile') || walletType === 'Solflare') {
                         console.log(`[${walletType}] Mobile wallet signing failed, offering fallback...`);
                         messageDiv.innerHTML = `
                             <div class="error">
