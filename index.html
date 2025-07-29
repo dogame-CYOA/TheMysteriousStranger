@@ -38,6 +38,7 @@
             min-height: 220px;
             overflow: hidden;
             position: relative;
+            box-sizing: border-box;
         }
         .artwork {
             max-width: 100%;
@@ -47,6 +48,7 @@
             object-fit: contain;
             background: #111;
             display: block;
+            margin: 0 auto;
         }
         .textbox {
             width: 92%;
@@ -143,27 +145,41 @@
             border: 1px solid #f5c6cb;
         }
         @media (max-width: 800px) {
-            .game-frame { width: 99vw; }
-            .artwork { height: 220px; }
+            .game-frame { 
+                width: 99vw; 
+                max-width: 99vw;
+                margin: 0 auto;
+            }
+            .artwork { 
+                max-height: 220px;
+                max-width: 95%;
+            }
         }
         @media (max-width: 768px) {
             .artwork {
-                max-width: 95%;
-                max-height: 280px;
+                max-width: 90%;
+                max-height: 200px;
             }
             .artwork-container {
-                min-height: 200px;
-                padding: 10px;
+                min-height: 180px;
+                padding: 5px;
+            }
+            .game-frame {
+                width: 100vw;
+                max-width: 100vw;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
             }
         }
         @media (max-width: 480px) {
             .artwork {
-                max-width: 90%;
-                max-height: 240px;
+                max-width: 85%;
+                max-height: 180px;
             }
             .artwork-container {
-                min-height: 180px;
-                padding: 8px;
+                min-height: 160px;
+                padding: 3px;
             }
         }
     </style>
@@ -554,21 +570,58 @@
                     }
                 }
                 
-                // Alternative detection methods for mobile wallets
+                // iOS Mobile Wallet Detection
                 if (!walletProvider) {
-                    // Check for mobile wallet providers
-                    if (window.solflare) {
+                    // Check for iOS mobile wallet providers
+                    if (window.solflare && typeof window.solflare.connect === 'function') {
                         walletProvider = window.solflare;
                         walletType = 'Solflare Mobile';
                         console.log('Found Solflare mobile wallet');
-                    } else if (window.backpack) {
+                    } else if (window.backpack && typeof window.backpack.connect === 'function') {
                         walletProvider = window.backpack;
                         walletType = 'Backpack Mobile';
                         console.log('Found Backpack mobile wallet');
-                    } else if (window.phantom) {
+                    } else if (window.phantom && typeof window.phantom.connect === 'function') {
                         walletProvider = window.phantom;
                         walletType = 'Phantom Mobile';
                         console.log('Found Phantom mobile wallet');
+                    }
+                }
+                
+                // iOS Web3 Provider Detection
+                if (!walletProvider && window.ethereum) {
+                    // Some mobile wallets inject ethereum provider
+                    if (window.ethereum.isSolflare) {
+                        walletProvider = window.ethereum;
+                        walletType = 'Solflare Mobile (Ethereum)';
+                        console.log('Found Solflare mobile wallet via ethereum provider');
+                    } else if (window.ethereum.isBackpack) {
+                        walletProvider = window.ethereum;
+                        walletType = 'Backpack Mobile (Ethereum)';
+                        console.log('Found Backpack mobile wallet via ethereum provider');
+                    }
+                }
+                
+                // Check for any wallet-like object
+                if (!walletProvider) {
+                    const walletObjects = Object.keys(window).filter(key => 
+                        key.toLowerCase().includes('solana') || 
+                        key.toLowerCase().includes('phantom') || 
+                        key.toLowerCase().includes('solflare') || 
+                        key.toLowerCase().includes('backpack') ||
+                        key.toLowerCase().includes('wallet')
+                    );
+                    console.log('Available wallet-like objects:', walletObjects);
+                    
+                    // Try to find any object with connect method
+                    for (const objName of walletObjects) {
+                        const obj = window[objName];
+                        if (obj && typeof obj.connect === 'function') {
+                            walletProvider = obj;
+                            walletType = `${objName} (Auto-detected)`;
+                            console.log(`Found wallet via auto-detection: ${objName}`);
+                            break;
+                        }
                     }
                 }
                 
@@ -594,7 +647,26 @@
                 let response;
                 try {
                     console.log(`[${walletType}] Attempting to connect...`);
-                    response = await walletProvider.connect();
+                    
+                    // iOS Mobile wallet specific handling
+                    if (walletType.includes('Mobile')) {
+                        // Mobile wallets often have different connection methods
+                        if (typeof walletProvider.connect === 'function') {
+                            response = await walletProvider.connect();
+                        } else if (typeof walletProvider.request === 'function') {
+                            // Some mobile wallets use request method
+                            response = await walletProvider.request({ method: 'connect' });
+                        } else if (typeof walletProvider.enable === 'function') {
+                            // Some use enable method
+                            response = await walletProvider.enable();
+                        } else {
+                            throw new Error('Mobile wallet does not support connection');
+                        }
+                    } else {
+                        // Desktop wallet connection
+                        response = await walletProvider.connect();
+                    }
+                    
                     console.log(`[${walletType}] Connection response:`, response);
                 } catch (connectError) {
                     console.error(`[${walletType}] Wallet connection failed:`, connectError);
@@ -612,9 +684,26 @@
                 } else if (response.address) {
                     // Some mobile wallets use 'address'
                     rawWalletAddress = response.address;
+                } else if (response.account) {
+                    // Some mobile wallets use 'account'
+                    rawWalletAddress = response.account;
+                } else if (response.accounts && response.accounts[0]) {
+                    // Some mobile wallets return array of accounts
+                    rawWalletAddress = response.accounts[0];
                 } else if (typeof response === 'string') {
                     // Some wallets return address directly as string
                     rawWalletAddress = response;
+                } else if (response && typeof response === 'object') {
+                    // Try to find any property that looks like an address
+                    const possibleAddresses = Object.values(response).filter(val => 
+                        typeof val === 'string' && val.length > 30 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(val)
+                    );
+                    if (possibleAddresses.length > 0) {
+                        rawWalletAddress = possibleAddresses[0];
+                    } else {
+                        console.error('Unexpected wallet response format:', response);
+                        throw new Error(`Unexpected response format from ${walletType}`);
+                    }
                 } else {
                     console.error('Unexpected wallet response format:', response);
                     throw new Error(`Unexpected response format from ${walletType}`);
@@ -649,7 +738,28 @@
                 
                 try {
                     // Wallet-specific signing methods
-                    if (walletType === 'Solflare' || walletType === 'Solflare Mobile') {
+                    if (walletType.includes('Mobile')) {
+                        // iOS Mobile wallet signing
+                        console.log(`[${walletType}] Attempting mobile wallet signing...`);
+                        
+                        if (typeof walletProvider.signMessage === 'function') {
+                            signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
+                        } else if (typeof walletProvider.sign === 'function') {
+                            signedMessage = await walletProvider.sign(encodedMessage);
+                        } else if (typeof walletProvider.request === 'function') {
+                            // Some mobile wallets use request method for signing
+                            signedMessage = await walletProvider.request({
+                                method: 'signMessage',
+                                params: [Array.from(encodedMessage)]
+                            });
+                        } else if (typeof walletProvider.signTransaction === 'function') {
+                            // Some mobile wallets use signTransaction
+                            signedMessage = await walletProvider.signTransaction(encodedMessage);
+                        } else {
+                            console.error(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
+                            throw new Error(`${walletType} does not support message signing`);
+                        }
+                    } else if (walletType === 'Solflare' || walletType === 'Solflare Mobile') {
                         // Solflare specific signing
                         if (typeof walletProvider.signMessage === 'function') {
                             signedMessage = await walletProvider.signMessage(encodedMessage, 'utf8');
@@ -678,7 +788,8 @@
                         }
                     }
                 } catch (signError) {
-                    console.error('Message signing failed:', signError);
+                    console.error(`[${walletType}] Message signing failed:`, signError);
+                    console.error(`[${walletType}] Available methods:`, Object.getOwnPropertyNames(walletProvider));
                     throw new Error(`Failed to sign message with ${walletType}. Please try again.`);
                 }
 
