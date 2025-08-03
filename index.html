@@ -144,6 +144,17 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .inventory-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #444;
+            color: #bfa76a;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            border: 1px solid #bfa76a;
+        }
         @media (max-width: 800px) {
             .game-frame { 
                 width: 99vw; 
@@ -226,10 +237,11 @@
                 <img src="SPEARMAN.jpg" alt="A man with a spear in the distance" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory1"></div>
                 The sun is low as you walk the lonely road. In the distance you see a man standing still gripping a long spear. Something about his posture and the way the light glints off his weapon makes you pause. You feel a strange pull perhaps he knows something about the path ahead or maybe you just crave a break from solitude.
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(2)">Approach the man</button>
-                    <button class="choice-btn" onclick="showScene(0)">Avoid him (but curiosity gnaws at you)</button>
+                    <button class="choice-btn" onclick="showScene(8)">Avoid him and continue down the path</button>
                 </div>
             </div>
         </div>
@@ -240,10 +252,11 @@
                 <img src="ZOOMMAN.jpg" alt="Zoomed in on the man" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory2"></div>
                 As you draw closer the man's features come into focus. He looks tired but determined. He raises his spear in greeting then asks "Traveler do you have a moment I need help with a task. If you assist me I promise a reward."
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(3)">Accept his request</button>
-                    <button class="choice-btn" onclick="showScene(0)">Say no (but something about his earnestness makes you reconsider)</button>
+                    <button class="choice-btn" onclick="showScene(8)">Say no and continue down the path</button>
                 </div>
             </div>
         </div>
@@ -254,24 +267,26 @@
                 <img src="REWARDKEY.jpg" alt="The man holding a key and a reward" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory3"></div>
                 The man smiles and reveals a small ornate key. "This key is needed to open the door on the mountain side to get my lost item. I cannot retrieve it alone. If you help me this key and a reward will be yours."
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(4)">Agree to help and head to the cave</button>
+                    <button class="choice-btn" onclick="acceptQuest()">Agree to help and head to the cave</button>
                 </div>
             </div>
         </div>
         
-        <!-- Scene 4 -->
+        <!-- Scene 4 - With Key -->
         <div id="scene4" class="scene">
             <div class="artwork-container">
                 <img src="CAVE.jpg" alt="Approaching the cave door" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory4"></div>
                 <span id="scene4-text">
-                You arrive at the mouth of the cave. The heavy wooden door is slightly ajar darkness yawning beyond. The air is thick with anticipation.
+                You arrive at the mouth of the cave. The heavy wooden door stands before you, and you remember the ornate key the stranger gave you. The air is thick with anticipation.
                 </span>
                 <div class="choices-container" id="scene4-choices">
-                    <button class="choice-btn" onclick="enterCave()">Go in</button>
+                    <button class="choice-btn" onclick="enterCave()">Use the key and go in</button>
                     <button class="choice-btn" onclick="lookAround()">Look around to see if the coast is clear</button>
                 </div>
                 <div class="choices-container" id="scene4-extra" style="display:none;"></div>
@@ -284,6 +299,7 @@
                 <img src="GOBLIN.jpg" alt="Attacked by goblins" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory5"></div>
                 As you step inside a shriek pierces the darkness. Goblins leap from the shadows brandishing crude weapons. There is no time to think only to fight.
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(6)">FIGHT</button>
@@ -297,6 +313,7 @@
                 <img src="GOBLIN.jpg" alt="Victory over goblins" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory6"></div>
                 With a swift and decisive strike, you deliver a fatal blow to one of the goblins. The other, seeing its companion fall, turns and flees into the darkness. You have successfully survived the encounter and proven your combat prowess.
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(7)">Explore the cave further</button>
@@ -310,9 +327,40 @@
                 <img src="GOBLINATTACK.jpg" alt="Treasure chest of gold" class="artwork">
             </div>
             <div class="textbox">
+                <div class="inventory-status" id="inventory7"></div>
                 Venturing deeper into the cave, you discover a hidden chamber. In the flickering light, you spot a magnificent chest overflowing with gold coins and precious gems. The stranger's lost item was indeed valuable - this treasure could change your fortune forever.
                 <div class="choices-container">
                     <button class="choice-btn" onclick="restartStory()">Claim the treasure and return to the stranger</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scene 8 - Avoided Stranger, Found Cave -->
+        <div id="scene8" class="scene">
+            <div class="artwork-container">
+                <img src="CAVE.jpg" alt="Cave door without key" class="artwork">
+            </div>
+            <div class="textbox">
+                <div class="inventory-status" id="inventory8"></div>
+                You continue down the path, avoiding the strange man with the spear. Eventually, you come across a cave with a heavy wooden door. You try to push it open, but it's firmly locked. Without a key, there's no way to enter. Perhaps you should have talked to that stranger after all...
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(1)">Go back and reconsider talking to the stranger</button>
+                    <button class="choice-btn" onclick="showScene(9)">Keep exploring the area around the cave</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scene 9 - Exploring Around Cave -->
+        <div id="scene9" class="scene">
+            <div class="artwork-container">
+                <img src="CAVE.jpg" alt="Exploring around the cave" class="artwork">
+            </div>
+            <div class="textbox">
+                <div class="inventory-status" id="inventory9"></div>
+                You search around the cave entrance, looking for another way in or perhaps a hidden key. After thoroughly examining every rock and crevice, you find nothing. The door remains stubbornly locked, and your curiosity about what lies within only grows stronger.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(1)">Return to find the stranger with the spear</button>
+                    <button class="choice-btn" onclick="restartStory()">Give up and start your journey over</button>
                 </div>
             </div>
         </div>
@@ -324,6 +372,10 @@
             ? 'http://localhost:3000' 
             : 'https://the-mysterious-stranger.vercel.app';
             
+        // Game state variables
+        let hasKey = false;
+        let acceptedQuest = false;
+        
         // Security: Input validation
         function sanitizeInput(input) {
             if (typeof input !== 'string') return '';
@@ -455,6 +507,26 @@
         let walletProvider = null;
         let connectedWallet = null;
 
+        // Update inventory display
+        function updateInventory() {
+            const inventoryElements = document.querySelectorAll('[id^="inventory"]');
+            inventoryElements.forEach(el => {
+                if (hasKey) {
+                    el.textContent = "🗝️ Ornate Key";
+                } else {
+                    el.textContent = "";
+                }
+            });
+        }
+
+        // Accept quest and receive key
+        function acceptQuest() {
+            acceptedQuest = true;
+            hasKey = true;
+            updateInventory();
+            showScene(4);
+        }
+
         // Check if user has a valid session on page load
         async function checkExistingSession() {
             const sessionData = await secureRetrieve('nft_session_token');
@@ -499,69 +571,60 @@
         // Enhanced wallet detection function
         function detectWallet() {
             console.log('Detecting wallets...');
-            console.log('Available window objects:', Object.keys(window).filter(k => 
-                k.toLowerCase().includes('solana') || 
-                k.toLowerCase().includes('phantom') || 
-                k.toLowerCase().includes('solflare') || 
-                k.toLowerCase().includes('backpack')
-            ));
             
-            // Check for Solflare first (most specific)
-            if (window.solflare && typeof window.solflare.connect === 'function') {
-                console.log('Solflare wallet detected via window.solflare');
-                console.log('Solflare methods:', Object.getOwnPropertyNames(window.solflare));
-                return { provider: window.solflare, type: 'Solflare' };
+            // Check for Phantom first (most common)
+            if (window.solana && window.solana.isPhantom) {
+                console.log('Phantom wallet detected');
+                return { provider: window.solana, type: 'Phantom' };
             }
             
-            // Check for Backpack
-            if (window.backpack && typeof window.backpack.connect === 'function') {
+            // Check for Backpack - multiple detection methods
+            if (window.backpack && window.backpack.solana) {
+                console.log('Backpack wallet detected via window.backpack.solana');
+                return { provider: window.backpack.solana, type: 'Backpack' };
+            }
+            
+            if (window.backpack) {
                 console.log('Backpack wallet detected via window.backpack');
-                console.log('Backpack methods:', Object.getOwnPropertyNames(window.backpack));
                 return { provider: window.backpack, type: 'Backpack' };
             }
             
-            // Check window.solana for different wallet types
-            if (window.solana) {
-                console.log('window.solana found');
-                console.log('window.solana properties:', {
-                    isPhantom: window.solana.isPhantom,
-                    isSolflare: window.solana.isSolflare,
-                    isBackpack: window.solana.isBackpack,
-                    isSlope: window.solana.isSlope,
-                    isGlow: window.solana.isGlow
-                });
-                console.log('window.solana methods:', Object.getOwnPropertyNames(window.solana));
-                
-                if (window.solana.isPhantom) {
-                    console.log('Phantom wallet detected');
-                    return { provider: window.solana, type: 'Phantom' };
-                }
-                
-                if (window.solana.isSolflare) {
-                    console.log('Solflare wallet detected via window.solana.isSolflare');
-                    return { provider: window.solana, type: 'Solflare' };
-                }
-                
-                if (window.solana.isBackpack) {
-                    console.log('Backpack wallet detected via window.solana.isBackpack');
-                    return { provider: window.solana, type: 'Backpack' };
-                }
-                
-                if (window.solana.isSlope) {
-                    console.log('Slope wallet detected');
-                    return { provider: window.solana, type: 'Slope' };
-                }
-                
-                if (window.solana.isGlow) {
-                    console.log('Glow wallet detected');
-                    return { provider: window.solana, type: 'Glow' };
-                }
-                
-                // Generic Solana wallet
-                if (typeof window.solana.connect === 'function') {
-                    console.log('Generic Solana wallet detected');
-                    return { provider: window.solana, type: 'Solana' };
-                }
+            if (window.solana && window.solana.isBackpack) {
+                console.log('Backpack wallet detected via window.solana.isBackpack');
+                return { provider: window.solana, type: 'Backpack' };
+            }
+            
+            // Check for Solflare - try multiple detection methods
+            if (window.solflare && window.solflare.solana) {
+                console.log('Solflare wallet detected via window.solflare.solana');
+                return { provider: window.solflare.solana, type: 'Solflare' };
+            }
+            
+            if (window.solflare) {
+                console.log('Solflare wallet detected via window.solflare');
+                return { provider: window.solflare, type: 'Solflare' };
+            }
+            
+            if (window.solana && window.solana.isSolflare) {
+                console.log('Solflare wallet detected via window.solana.isSolflare');
+                return { provider: window.solana, type: 'Solflare' };
+            }
+            
+            // Check for other wallets
+            if (window.solana && window.solana.isSlope) {
+                console.log('Slope wallet detected');
+                return { provider: window.solana, type: 'Slope' };
+            }
+            
+            if (window.solana && window.solana.isGlow) {
+                console.log('Glow wallet detected');
+                return { provider: window.solana, type: 'Glow' };
+            }
+            
+            // Generic Solana wallet (fallback)
+            if (window.solana && typeof window.solana.connect === 'function') {
+                console.log('Generic Solana wallet detected');
+                return { provider: window.solana, type: 'Solana' };
             }
             
             console.log('No wallet detected');
@@ -574,121 +637,105 @@
             const encodedMessage = new TextEncoder().encode(message);
             
             console.log(`[${type}] Attempting to sign message...`);
-            console.log(`[${type}] Message to sign:`, message);
-            console.log(`[${type}] Encoded message:`, encodedMessage);
+            console.log(`[${type}] Provider object:`, provider);
             console.log(`[${type}] Available methods:`, Object.getOwnPropertyNames(provider));
             
             try {
-                let signResult;
-                
-                if (type === 'Solflare') {
-                    console.log(`[${type}] Using Solflare-specific signing...`);
-                    
-                    // Solflare has very specific requirements
-                    if (typeof provider.signMessage === 'function') {
-                        try {
-                            console.log(`[${type}] Trying signMessage with Uint8Array...`);
-                            signResult = await provider.signMessage(encodedMessage);
-                            console.log(`[${type}] signMessage result:`, signResult);
-                        } catch (error1) {
-                            console.log(`[${type}] First attempt failed:`, error1.message);
-                            try {
-                                console.log(`[${type}] Trying signMessage with string...`);
-                                signResult = await provider.signMessage(message);
-                                console.log(`[${type}] signMessage with string result:`, signResult);
-                            } catch (error2) {
-                                console.log(`[${type}] Second attempt failed:`, error2.message);
-                                throw new Error(`Solflare signMessage failed: ${error2.message}`);
-                            }
-                        }
-                    } else {
-                        throw new Error('Solflare wallet does not have signMessage method');
-                    }
-                } else if (type === 'Backpack') {
-                    console.log(`[${type}] Using Backpack-specific signing...`);
-                    
-                    if (typeof provider.signMessage === 'function') {
-                        try {
-                            console.log(`[${type}] Trying signMessage with Uint8Array...`);
-                            signResult = await provider.signMessage(encodedMessage);
-                            console.log(`[${type}] signMessage result:`, signResult);
-                        } catch (error1) {
-                            console.log(`[${type}] First attempt failed:`, error1.message);
-                            try {
-                                console.log(`[${type}] Trying signMessage with string...`);
-                                signResult = await provider.signMessage(message);
-                                console.log(`[${type}] signMessage with string result:`, signResult);
-                            } catch (error2) {
-                                console.log(`[${type}] Second attempt failed:`, error2.message);
-                                throw new Error(`Backpack signMessage failed: ${error2.message}`);
-                            }
-                        }
-                    } else {
-                        throw new Error('Backpack wallet does not have signMessage method');
-                    }
-                } else {
-                    // Phantom and other wallets
-                    console.log(`[${type}] Using standard signing...`);
-                    
-                    if (typeof provider.signMessage === 'function') {
-                        try {
-                            console.log(`[${type}] Trying signMessage with standard parameters...`);
-                            signResult = await provider.signMessage(encodedMessage, 'utf8');
-                            console.log(`[${type}] signMessage result:`, signResult);
-                        } catch (error1) {
-                            console.log(`[${type}] UTF8 method failed:`, error1.message);
-                            try {
-                                console.log(`[${type}] Trying signMessage without encoding...`);
-                                signResult = await provider.signMessage(encodedMessage);
-                                console.log(`[${type}] signMessage without encoding result:`, signResult);
-                            } catch (error2) {
-                                console.log(`[${type}] Standard method failed:`, error2.message);
-                                throw new Error(`${type} signMessage failed: ${error2.message}`);
-                            }
-                        }
-                    } else {
-                        throw new Error(`${type} wallet does not have signMessage method`);
-                    }
-                }
-                
-                console.log(`[${type}] Full signing result:`, signResult);
-                console.log(`[${type}] Result type:`, typeof signResult);
-                console.log(`[${type}] Result keys:`, signResult ? Object.keys(signResult) : 'null');
-                
-                // Extract signature from result
                 let signature;
-                if (signResult && signResult.signature) {
-                    signature = signResult.signature;
-                    console.log(`[${type}] Found signature in result.signature:`, signature);
-                } else if (signResult && signResult.data) {
-                    signature = signResult.data;
-                    console.log(`[${type}] Found signature in result.data:`, signature);
-                } else if (signResult && typeof signResult === 'object' && signResult.constructor === Uint8Array) {
-                    signature = signResult;
-                    console.log(`[${type}] Result is directly a Uint8Array:`, signature);
-                } else if (typeof signResult === 'string') {
-                    signature = signResult;
-                    console.log(`[${type}] Result is directly a string:`, signature);
-                } else {
-                    console.error(`[${type}] Unexpected signature format:`, signResult);
-                    throw new Error(`Unexpected signature format from ${type}`);
+                
+                switch (type) {
+                    case 'Phantom':
+                        // Phantom uses standard signMessage
+                        if (typeof provider.signMessage === 'function') {
+                            const result = await provider.signMessage(encodedMessage, 'utf8');
+                            signature = result.signature;
+                        } else {
+                            throw new Error('Phantom wallet does not support message signing');
+                        }
+                        break;
+                        
+                    case 'Backpack':
+                        // Backpack specific signing logic
+                        if (typeof provider.signMessage === 'function') {
+                            try {
+                                console.log(`[${type}] Trying standard signMessage with utf8...`);
+                                const result = await provider.signMessage(encodedMessage, 'utf8');
+                                signature = result.signature;
+                            } catch (error) {
+                                console.log(`[${type}] UTF8 method failed, trying without encoding...`, error);
+                                try {
+                                    const result = await provider.signMessage(encodedMessage);
+                                    signature = result.signature;
+                                } catch (error2) {
+                                    console.log(`[${type}] Standard methods failed, trying alternative...`, error2);
+                                    // Some Backpack versions might use different method signatures
+                                    const result = await provider.signMessage(message);
+                                    signature = result.signature;
+                                }
+                            }
+                        } else if (typeof provider.sign === 'function') {
+                            console.log(`[${type}] Using provider.sign method...`);
+                            const result = await provider.sign(encodedMessage);
+                            signature = result.signature;
+                        } else {
+                            throw new Error('Backpack wallet does not support message signing');
+                        }
+                        break;
+                        
+                    case 'Solflare':
+                        // Solflare has different signing methods
+                        if (typeof provider.signMessage === 'function') {
+                            try {
+                                // Try the standard method first
+                                const result = await provider.signMessage(encodedMessage, 'utf8');
+                                signature = result.signature;
+                            } catch (error) {
+                                console.log(`[${type}] Standard signMessage failed, trying alternative...`);
+                                // Try alternative method
+                                const result = await provider.signMessage(encodedMessage);
+                                signature = result.signature;
+                            }
+                        } else if (typeof provider.sign === 'function') {
+                            const result = await provider.sign(encodedMessage);
+                            signature = result.signature;
+                        } else {
+                            throw new Error('Solflare wallet does not support message signing');
+                        }
+                        break;
+                        
+                    case 'Slope':
+                    case 'Glow':
+                    case 'Solana':
+                    default:
+                        // Generic signing approach
+                        if (typeof provider.signMessage === 'function') {
+                            try {
+                                const result = await provider.signMessage(encodedMessage, 'utf8');
+                                signature = result.signature;
+                            } catch (error) {
+                                console.log(`[${type}] UTF8 encoding failed, trying without...`);
+                                const result = await provider.signMessage(encodedMessage);
+                                signature = result.signature;
+                            }
+                        } else if (typeof provider.sign === 'function') {
+                            const result = await provider.sign(encodedMessage);
+                            signature = result.signature;
+                        } else {
+                            throw new Error(`${type} wallet does not support message signing`);
+                        }
+                        break;
                 }
                 
-                // Convert signature to base58 string if needed
-                let finalSignature;
+                console.log(`[${type}] Signing successful:`, signature);
+                
+                // Convert signature to base58 if it's a Uint8Array
                 if (signature instanceof Uint8Array) {
-                    finalSignature = base58Encode(signature);
-                    console.log(`[${type}] Converted Uint8Array to base58:`, finalSignature);
+                    return base58Encode(signature);
                 } else if (typeof signature === 'string') {
-                    finalSignature = signature;
-                    console.log(`[${type}] Using string signature directly:`, finalSignature);
+                    return signature;
                 } else {
-                    console.error(`[${type}] Cannot process signature type:`, typeof signature, signature);
-                    throw new Error(`Cannot process signature from ${type}`);
+                    throw new Error(`Unsupported signature format from ${type}`);
                 }
-                
-                console.log(`[${type}] Final signature:`, finalSignature);
-                return finalSignature;
                 
             } catch (error) {
                 console.error(`[${type}] Signing failed:`, error);
@@ -734,66 +781,22 @@
                 
                 // Extract wallet address from response
                 let rawWalletAddress;
-                console.log(`[${type}] Full connection response:`, response);
-                console.log(`[${type}] Response type:`, typeof response);
-                console.log(`[${type}] Response constructor:`, response ? response.constructor.name : 'null');
-                console.log(`[${type}] Response keys:`, response ? Object.keys(response) : 'null');
-                
-                if (response && response.publicKey) {
-                    console.log(`[${type}] Found publicKey:`, response.publicKey);
-                    if (typeof response.publicKey.toString === 'function') {
-                        rawWalletAddress = response.publicKey.toString();
-                    } else {
-                        rawWalletAddress = response.publicKey;
-                    }
-                } else if (response && response.pubkey) {
-                    console.log(`[${type}] Found pubkey:`, response.pubkey);
+                if (response.publicKey) {
+                    rawWalletAddress = response.publicKey.toString();
+                } else if (response.pubkey) {
                     rawWalletAddress = response.pubkey.toString();
-                } else if (response && response.address) {
-                    console.log(`[${type}] Found address:`, response.address);
+                } else if (response.address) {
                     rawWalletAddress = response.address;
-                } else if (response && response.account) {
-                    console.log(`[${type}] Found account:`, response.account);
+                } else if (response.account) {
                     rawWalletAddress = response.account;
-                } else if (response && response.accounts && response.accounts[0]) {
-                    console.log(`[${type}] Found accounts[0]:`, response.accounts[0]);
+                } else if (response.accounts && response.accounts[0]) {
                     rawWalletAddress = response.accounts[0];
                 } else if (typeof response === 'string') {
-                    console.log(`[${type}] Response is string:`, response);
                     rawWalletAddress = response;
-                } else if (response && typeof response === 'object') {
-                    // Debug: log all properties to find the address
-                    console.log(`[${type}] Searching for address in response properties:`);
-                    for (const [key, value] of Object.entries(response)) {
-                        console.log(`[${type}] ${key}:`, value, typeof value);
-                        if (typeof value === 'string' && value.length > 30 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(value)) {
-                            console.log(`[${type}] Found potential address in ${key}:`, value);
-                            rawWalletAddress = value;
-                            break;
-                        } else if (value && typeof value === 'object' && typeof value.toString === 'function') {
-                            try {
-                                const stringValue = value.toString();
-                                if (stringValue.length > 30 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(stringValue)) {
-                                    console.log(`[${type}] Found potential address by toString() in ${key}:`, stringValue);
-                                    rawWalletAddress = stringValue;
-                                    break;
-                                }
-                            } catch (e) {
-                                console.log(`[${type}] Could not toString() ${key}:`, e.message);
-                            }
-                        }
-                    }
-                    
-                    if (!rawWalletAddress) {
-                        console.error(`[${type}] Could not find wallet address in response:`, response);
-                        throw new Error(`Could not extract wallet address from ${type} response`);
-                    }
                 } else {
-                    console.error(`[${type}] Unexpected wallet response format:`, response);
+                    console.error('Unexpected wallet response format:', response);
                     throw new Error(`Unexpected response format from ${type}`);
                 }
-                
-                console.log(`[${type}] Raw wallet address:`, rawWalletAddress);
                 
                 // Validate wallet address
                 if (!isValidWalletAddress(rawWalletAddress)) {
@@ -920,46 +923,78 @@
                 document.getElementById('scene'+num).classList.add('active');
             }
             
-            // Reset scene 4 state every time you enter it
+            // Update inventory display whenever scene changes
+            updateInventory();
+            
+            // Reset scene 4 state every time you enter it (but preserve key status)
             if (num === 4) {
-                document.getElementById('scene4-text').innerText =
-                    "You arrive at the mouth of the cave. The heavy wooden door is slightly ajar darkness yawning beyond. The air is thick with anticipation.";
-                document.getElementById('scene4-choices').style.display = '';
+                if (hasKey) {
+                    document.getElementById('scene4-text').innerText =
+                        "You arrive at the mouth of the cave. The heavy wooden door stands before you, and you remember the ornate key the stranger gave you. The air is thick with anticipation.";
+                    document.getElementById('scene4-choices').style.display = '';
+                    document.getElementById('scene4-choices').innerHTML = `
+                        <button class="choice-btn" onclick="enterCave()">Use the key and go in</button>
+                        <button class="choice-btn" onclick="lookAround()">Look around to see if the coast is clear</button>
+                    `;
+                } else {
+                    // This shouldn't happen if logic is correct, but just in case
+                    document.getElementById('scene4-text').innerText =
+                        "You arrive at the mouth of the cave. The heavy wooden door is locked tight. Without a key, you cannot enter.";
+                    document.getElementById('scene4-choices').style.display = '';
+                    document.getElementById('scene4-choices').innerHTML = `
+                        <button class="choice-btn" onclick="showScene(1)">Go back to find the stranger</button>
+                    `;
+                }
                 document.getElementById('scene4-extra').style.display = 'none';
                 document.getElementById('scene4-extra').innerHTML = '';
             }
         }
 
         function restartStory() {
+            // Reset game state
+            hasKey = false;
+            acceptedQuest = false;
+            updateInventory();
             showScene(0);
         }
 
-        // Scene 4 logic
+        // Scene 4 logic - only works if player has key
         function enterCave() {
-            showScene(5);
+            if (hasKey) {
+                showScene(5);
+            } else {
+                // This shouldn't happen, but just in case
+                alert("You need a key to enter the cave!");
+            }
         }
 
         function lookAround() {
+            if (!hasKey) {
+                // This shouldn't happen in normal gameplay
+                return;
+            }
+            
             const extra = document.getElementById('scene4-extra');
             extra.innerHTML = '';
             if (Math.floor(Math.random()*6) === 0) {
                 document.getElementById('scene4-text').innerText =
-                    "You listen closely. Suddenly you hear shuffling and guttural whispers on the other side of the door. Before you can react the door bursts open.";
+                    "You listen closely and use your key to quietly unlock the door. Suddenly you hear shuffling and guttural whispers on the other side. Before you can react, the door bursts open from the inside!";
                 document.getElementById('scene4-choices').style.display = 'none';
                 extra.style.display = '';
-                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Sneak in and attack</button> <button class='choice-btn' onclick='showScene(0)'>This is too scary runaway</button>`;
+                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Stand your ground and fight</button> <button class='choice-btn' onclick='showScene(1)'>This is too scary, run back to the stranger</button>`;
             } else {
                 document.getElementById('scene4-text').innerText =
-                    "You look around carefully. All seems quiet. Gathering your courage you decide to unlock the door and go in.";
+                    "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door. Gathering your courage, you decide to go in.";
                 document.getElementById('scene4-choices').style.display = 'none';
                 extra.style.display = '';
-                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Unlock the door and go in</button>`;
+                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Enter the cave quietly</button>`;
             }
         }
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
             await initializeEncryption();
+            updateInventory(); // Initialize inventory display
             checkExistingSession();
         });
     </script>
