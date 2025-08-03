@@ -10,7 +10,6 @@ const REQUIRED_NFT_ADDRESSES = [
 ];
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const AUTHENTICATED_SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours for authenticated users
-const BROWSING_SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 hours for browsing users
 const REQUEST_SIGNING_SECRET = process.env.REQUEST_SIGNING_SECRET || crypto.randomBytes(32).toString('hex');
 
 // Security: Enhanced rate limiting with different limits for different actions
@@ -18,7 +17,6 @@ const rateLimitStore = new Map();
 const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes
 const MAX_REQUESTS_PER_WINDOW = 10;
 const MAX_CHALLENGE_REQUESTS = 5; // Stricter limit for challenge generation
-const MAX_BROWSING_REQUESTS = 3; // Very strict limit for browsing sessions
 
 // Security: Session and challenge management
 const activeSessions = new Map();
@@ -70,9 +68,6 @@ function checkRateLimit(identifier, type = 'general') {
   switch (type) {
     case 'challenge':
       maxRequests = MAX_CHALLENGE_REQUESTS;
-      break;
-    case 'browsing':
-      maxRequests = MAX_BROWSING_REQUESTS;
       break;
     case 'verify':
       maxRequests = MAX_REQUESTS_PER_WINDOW;
@@ -138,14 +133,7 @@ function generateSecureToken(walletAddress) {
   return `${Buffer.from(data).toString('base64')}.${hash}`;
 }
 
-// Security: Generate browsing session token (shorter duration)
-function generateBrowsingToken() {
-  const timestamp = Date.now();
-  const randomPart = Math.random().toString(36).substring(2) + Date.now().toString(36);
-  const data = `browsing-${timestamp}-${randomPart}`;
-  const hash = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
-  return `browsing_${Buffer.from(data).toString('base64')}.${hash}`;
-}
+
 
 // Security: Validate wallet address format
 function isValidWalletAddress(address) {
@@ -233,7 +221,7 @@ export default async function handler(req, res) {
         valid: true,
         walletAddress: session.walletAddress.substring(0, 8) + '...',
         expires: session.expires,
-        sessionType: session.type || 'authenticated'
+        sessionType: 'authenticated'
       });
     } else {
       activeSessions.delete(token);
@@ -321,41 +309,7 @@ export default async function handler(req, res) {
       });
     }
     
-    // Step 1.5: Create browsing session (no wallet required)
-    if (action === 'browsing') {
-      console.log(`[${requestId}] Creating browsing session`);
-      
-      // Security: Rate limiting for browsing sessions
-      if (!checkRateLimit(`browsing_${clientIP}`, 'browsing')) {
-        console.log(`[${requestId}] Rate limit exceeded for browsing sessions`);
-        return res.status(429).json({
-          success: false,
-          error: 'Too many browsing session requests. Please try again later.'
-        });
-      }
-      
-      // Generate browsing session token
-      const browsingToken = generateBrowsingToken();
-      const expires = Date.now() + BROWSING_SESSION_DURATION;
-      
-      // Store browsing session
-      activeSessions.set(browsingToken, {
-        walletAddress: 'browsing_user',
-        expires,
-        type: 'browsing',
-        createdAt: Date.now()
-      });
-      
-      console.log(`[${requestId}] Browsing session created, expires in ${BROWSING_SESSION_DURATION / (60 * 60 * 1000)} hours`);
-      
-      return res.status(200).json({
-        success: true,
-        sessionToken: browsingToken,
-        expires,
-        sessionType: 'browsing',
-        message: 'Browsing session created. You can explore the game but will need to authenticate with a wallet to access the full adventure.'
-      });
-    }
+
     
     // Step 2: Verify signature and check NFT ownership
     if (action === 'verify') {
