@@ -811,16 +811,93 @@
                 const { provider, type } = walletInfo;
                 console.log(`Found ${type} wallet`);
 
-                // Connect to wallet
-                messageDiv.innerHTML = `<div class="loading">Connecting to ${type}...</div>`;
-                
+                // Connect to wallet with wallet-specific handling
                 let response;
                 try {
-                    response = await provider.connect();
+                    console.log(`[${type}] Attempting to connect...`);
+                    console.log(`[${type}] Available methods:`, Object.getOwnPropertyNames(provider));
+                    
+                    // iOS Mobile wallet specific handling
+                    if (type.includes('Mobile')) {
+                        console.log(`[${type}] Using mobile wallet connection...`);
+                        
+                        // Add a small delay for mobile wallets to initialize
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Mobile wallets often have different connection methods
+                        if (typeof provider.connect === 'function') {
+                            console.log(`[${type}] Using connect() method`);
+                            try {
+                                response = await provider.connect();
+                            } catch (error) {
+                                console.log(`[${type}] Connect() failed, trying request()...`);
+                                if (typeof provider.request === 'function') {
+                                    response = await provider.request({ method: 'connect' });
+                                } else {
+                                    throw error;
+                                }
+                            }
+                        } else if (typeof provider.request === 'function') {
+                            // Some mobile wallets use request method
+                            console.log(`[${type}] Using request() method`);
+                            response = await provider.request({ method: 'connect' });
+                        } else if (typeof provider.enable === 'function') {
+                            // Some use enable method
+                            console.log(`[${type}] Using enable() method`);
+                            response = await provider.enable();
+                        } else if (typeof provider.getAccounts === 'function') {
+                            // Some mobile wallets use getAccounts
+                            console.log(`[${type}] Using getAccounts() method`);
+                            response = await provider.getAccounts();
+                        } else {
+                            console.error(`[${type}] No supported connection method found`);
+                            throw new Error('Mobile wallet does not support connection');
+                        }
+                    } else {
+                        // Desktop wallet connection
+                        console.log(`[${type}] Using desktop wallet connection`);
+                        response = await provider.connect();
+                    }
+                    
                     console.log(`[${type}] Connection response:`, response);
+                    console.log(`[${type}] Response type:`, typeof response);
+                    console.log(`[${type}] Response keys:`, response ? Object.keys(response) : 'null');
                 } catch (connectError) {
-                    console.error(`[${type}] Connection failed:`, connectError);
-                    throw new Error(`Failed to connect to ${type}. Please try again.`);
+                    console.error(`[${type}] Wallet connection failed:`, connectError);
+                    
+                    // For mobile wallets, try alternative connection methods
+                    if (type.includes('Mobile') && (connectError.message.includes('Plugin Closed') || connectError.message.includes('Failed to connect'))) {
+                        console.log(`[${type}] Plugin closed error detected, trying alternative methods...`);
+                        
+                        // Wait a bit longer before retry
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        try {
+                            // Try different connection approaches for mobile
+                            if (typeof provider.request === 'function') {
+                                console.log(`[${type}] Trying request method with different parameters...`);
+                                response = await provider.request({ 
+                                    method: 'connect',
+                                    params: []
+                                });
+                            } else if (typeof provider.enable === 'function') {
+                                console.log(`[${type}] Trying enable method...`);
+                                response = await provider.enable();
+                            } else if (typeof provider.getAccounts === 'function') {
+                                console.log(`[${type}] Trying getAccounts method...`);
+                                response = await provider.getAccounts();
+                            } else {
+                                throw new Error('No alternative connection methods available');
+                            }
+                            
+                            console.log(`[${type}] Alternative connection successful:`, response);
+                        } catch (altError) {
+                            console.error(`[${type}] Alternative connection methods also failed:`, altError);
+                            throw new Error(`Failed to connect to ${type}. Please ensure the wallet app is open and try again.`);
+                        }
+                    } else {
+                        throw new Error(`Failed to connect to ${type}. Please try again.`);
+                    }
                 }
                 
                 // Extract wallet address from response
