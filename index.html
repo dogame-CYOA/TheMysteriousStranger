@@ -214,7 +214,6 @@
                 
                 <div class="choices-container" style="margin-top:24px;">
                     <button class="choice-btn" onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
-                    <button class="choice-btn" onclick="createBrowsingSession()" id="browseBtn" style="margin-top:12px; background-color:#666;">Browse Without Wallet</button>
                 </div>
             </div>
         </div>
@@ -308,30 +307,30 @@
             </div>
         </div>
         
-        <!-- Scene 6 - Victory Over Goblins -->
+        <!-- Scene 6 -->
         <div id="scene6" class="scene">
             <div class="artwork-container">
-                <img src="GOBLIN.jpg" alt="Victory over goblins" class="artwork">
+                <img src="GOBLINATTACK.jpg" alt="Victory over goblins" class="artwork">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory6"></div>
-                With a swift and decisive strike, you deliver a fatal blow to one of the goblins. The other, seeing its companion fall, turns and flees into the darkness. You have successfully survived the encounter and proven your combat prowess.
+                You have successfully defeated the goblins! With a swift strike, you deliver a fatal blow to one while the other flees in terror. The cave is now safe to explore further.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(7)">Explore the cave further</button>
+                    <button class="choice-btn" onclick="showScene(7)">Explore the cave and find the treasure</button>
                 </div>
             </div>
         </div>
         
-        <!-- Scene 7 - Treasure Chest -->
+        <!-- Scene 7 -->
         <div id="scene7" class="scene">
             <div class="artwork-container">
-                <img src="GOBLINATTACK.jpg" alt="Treasure chest of gold" class="artwork">
+                <img src="TREASURE.jpg" alt="Treasure chest of gold" class="artwork">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory7"></div>
-                Venturing deeper into the cave, you discover a hidden chamber. In the flickering light, you spot a magnificent chest overflowing with gold coins and precious gems. The stranger's lost item was indeed valuable - this treasure could change your fortune forever.
+                Deep in the cave, you discover a magnificent treasure chest filled with gold coins and precious gems! The stranger's lost item was indeed valuable. You have completed your quest and earned both the key and this incredible reward.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="restartStory()">Claim the treasure and return to the stranger</button>
+                    <button class="choice-btn" onclick="showScene(0)">Return to the beginning</button>
                 </div>
             </div>
         </div>
@@ -575,14 +574,8 @@
                         connectedWallet = data.walletAddress;
                         updateWalletStatus(`Connected: ${data.walletAddress.substring(0, 8)}...`, true);
                         
-                        // Handle different session types
-                        if (data.sessionType === 'browsing') {
-                            console.log('Browsing session active - limited access');
-                            showScene(0); // Show main page but with limited access
-                        } else {
-                            console.log('Authenticated session active - full access');
-                            showScene(0); // Full access to the game
-                        }
+                        console.log('Authenticated session active - full access');
+                        showScene(0); // Full access to the game
                         return true;
                     }
                 }
@@ -594,59 +587,7 @@
             return false;
         }
 
-        // Create browsing session for users who want to explore without wallet
-        async function createBrowsingSession() {
-            const messageDiv = document.getElementById('verificationMessage');
-            messageDiv.innerHTML = '<div class="loading">Creating browsing session...</div>';
-            
-            try {
-                const timestamp = Date.now().toString();
-                const response = await fetch(`${API_BASE_URL}/api/verify-nft`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Request-Timestamp': timestamp
-                    },
-                    body: JSON.stringify({
-                        action: 'browsing',
-                        timestamp: timestamp
-                    })
-                });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success) {
-                        // Store browsing session
-                        await secureStore('nft_session_token', {
-                            token: data.sessionToken,
-                            wallet: 'Browsing User',
-                            walletType: 'Browsing',
-                            timestamp: Date.now(),
-                            sessionType: 'browsing'
-                        });
-                        
-                        isVerified = true;
-                        sessionToken = data.sessionToken;
-                        connectedWallet = 'Browsing User';
-                        updateWalletStatus('Browsing Mode (Limited Access)', true);
-                        
-                        messageDiv.innerHTML = '<div class="success">Browsing session created! You can explore the game.</div>';
-                        
-                        setTimeout(() => {
-                            showScene(0);
-                        }, 2000);
-                        
-                        return true;
-                    }
-                }
-                
-                throw new Error('Failed to create browsing session');
-            } catch (error) {
-                console.error('Browsing session creation failed:', error);
-                messageDiv.innerHTML = '<div class="error">Failed to create browsing session. Please try again.</div>';
-                return false;
-            }
-        }
 
         // Update wallet connection status display
         function updateWalletStatus(message, connected = false) {
