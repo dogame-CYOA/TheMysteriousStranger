@@ -41,21 +41,20 @@
             border-radius: 6px 6px 0 0;
             min-height: 220px;
             max-height: 220px;
-            overflow: visible;
+            overflow: hidden;
             position: relative;
             box-sizing: border-box;
             padding: 0 10px;
         }
         .artwork {
             max-width: 100%;
-            max-height: 420px;
+            max-height: 100%;
             width: auto;
             height: auto;
             object-fit: contain;
             background: #111;
             display: block;
             margin: 0 auto;
-            min-width: 90%;
         }
         .textbox {
             width: 92%;
@@ -190,22 +189,20 @@
                 transform: translateX(-50%);
             }
             .artwork { 
-                max-height: 220px;
+                max-height: 100%;
                 max-width: 100%;
-                min-width: 85%;
             }
         }
         @media (max-width: 768px) {
             .artwork {
                 max-width: 100%;
-                max-height: 200px;
-                min-width: 80%;
+                max-height: 100%;
             }
             .artwork-container {
                 min-height: 180px;
                 max-height: 180px;
                 padding: 5px;
-                overflow: visible;
+                overflow: hidden;
             }
             .game-frame {
                 width: 98vw;
@@ -223,14 +220,13 @@
         @media (max-width: 480px) {
             .artwork {
                 max-width: 100%;
-                max-height: 180px;
-                min-width: 75%;
+                max-height: 100%;
             }
             .artwork-container {
                 min-height: 160px;
                 max-height: 160px;
                 padding: 3px;
-                overflow: visible;
+                overflow: hidden;
             }
             .game-frame {
                 width: 96vw;
