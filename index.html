@@ -61,7 +61,7 @@
             font-family: 'Courier New', Courier, monospace;
             font-size: 1.18em;
             color: #222;
-            padding: 18px 18px 10px 18px;
+            padding: 40px 18px 10px 18px; /* Increased top padding to make room for inventory status */
             min-height: 90px;
             position: relative;
         }
@@ -154,7 +154,9 @@
             border-radius: 4px;
             font-size: 0.8em;
             border: 1px solid #bfa76a;
+            z-index: 10;
         }
+
         @media (max-width: 800px) {
             .game-frame { 
                 width: 99vw; 
@@ -556,6 +558,13 @@
             const sessionData = await secureRetrieve('nft_session_token');
             if (!sessionData || !sessionData.token) return false;
             
+            // Check local expiration first
+            if (sessionData.timestamp && (Date.now() - sessionData.timestamp) > (23 * 60 * 60 * 1000)) {
+                console.log('Session expired locally on page load');
+                sessionStorage.removeItem('nft_session_token');
+                return false;
+            }
+            
             const token = sessionData.token;
 
             try {
@@ -574,6 +583,10 @@
                         connectedWallet = data.walletAddress;
                         updateWalletStatus(`Connected: ${data.walletAddress.substring(0, 8)}...`, true);
                         
+                        // Update local timestamp
+                        sessionData.timestamp = Date.now();
+                        await secureStore('nft_session_token', sessionData);
+                        
                         console.log('Authenticated session active - full access');
                         showScene(0); // Full access to the game
                         return true;
@@ -581,9 +594,19 @@
                 }
             } catch (error) {
                 console.error('Session check failed:', error);
+                // On network error, allow local session to continue for a short time
+                if (sessionData.timestamp && (Date.now() - sessionData.timestamp) < (30 * 60 * 1000)) {
+                    console.log('Network error on page load, allowing local session to continue');
+                    isVerified = true;
+                    sessionToken = token;
+                    connectedWallet = sessionData.wallet || 'Unknown';
+                    updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}... (Local)`, true);
+                    showScene(0);
+                    return true;
+                }
             }
 
-            localStorage.removeItem('nft_session_token');
+            sessionStorage.removeItem('nft_session_token');
             return false;
         }
 
@@ -1027,6 +1050,12 @@
             const sessionData = await secureRetrieve('nft_session_token');
             if (!sessionData || !sessionData.token) return false;
             
+            // Check if session is expired locally first (5 minute buffer)
+            if (sessionData.timestamp && (Date.now() - sessionData.timestamp) > (23 * 60 * 60 * 1000)) {
+                console.log('Session expired locally');
+                return false;
+            }
+            
             const token = sessionData.token;
 
             try {
@@ -1039,18 +1068,28 @@
 
                 if (response.ok) {
                     const data = await response.json();
+                    if (data.valid) {
+                        // Update local timestamp to extend local cache
+                        sessionData.timestamp = Date.now();
+                        await secureStore('nft_session_token', sessionData);
+                    }
                     return data.valid;
                 }
             } catch (error) {
                 console.error('Session verification failed:', error);
+                // On network error, allow local session to continue for a short time
+                if (sessionData.timestamp && (Date.now() - sessionData.timestamp) < (30 * 60 * 1000)) {
+                    console.log('Network error, allowing local session to continue');
+                    return true;
+                }
             }
 
             return false;
         }
 
         async function showScene(num) {
-            // Always verify session before showing scenes (except verification page)
-            if (num !== 'verification') {
+            // Only verify session on critical actions, not every scene change
+            if (num !== 'verification' && (num === 0 || num === 1)) {
                 const sessionValid = await verifySession();
                 if (!sessionValid) {
                     isVerified = false;
