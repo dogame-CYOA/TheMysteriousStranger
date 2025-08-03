@@ -14,6 +14,7 @@
             align-items: center;
             padding: 0;
             margin: 0;
+            box-sizing: border-box;
         }
         .game-frame {
             background: #111;
@@ -26,6 +27,8 @@
             flex-direction: column;
             align-items: center;
             padding: 0 0 24px 0;
+            margin: 0 auto;
+            box-sizing: border-box;
         }
         .artwork-container {
             width: 100%;
@@ -154,11 +157,9 @@
             border-radius: 4px;
             font-size: 0.9em;
             z-index: 10;
-            max-width: 120px;
+            min-width: 100px;
             text-align: center;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .textbox {
@@ -176,6 +177,8 @@
                 width: 95vw; 
                 max-width: 95vw;
                 margin: 0 auto;
+                left: 50%;
+                transform: translateX(-50%);
             }
             .artwork { 
                 max-height: 220px;
@@ -195,9 +198,11 @@
                 width: 98vw;
                 max-width: 98vw;
                 margin: 0 auto;
+                left: 50%;
+                transform: translateX(-50%);
             }
             .inventory-status {
-                max-width: 100px;
+                min-width: 90px;
                 font-size: 0.85em;
                 padding: 4px 8px;
             }
@@ -215,9 +220,11 @@
                 width: 96vw;
                 max-width: 96vw;
                 margin: 0 auto;
+                left: 50%;
+                transform: translateX(-50%);
             }
             .inventory-status {
-                max-width: 90px;
+                min-width: 80px;
                 font-size: 0.8em;
                 padding: 3px 6px;
             }
