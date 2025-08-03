@@ -207,6 +207,8 @@ class WalletAdapterManager {
         const adapter = wallet.adapter;
         
         try {
+            console.log('Solflare adapter available methods:', Object.getOwnPropertyNames(adapter));
+            
             // Try multiple connection methods for Solflare
             if (typeof adapter.connect === 'function') {
                 console.log('Trying Solflare connect() method...');
@@ -220,7 +222,11 @@ class WalletAdapterManager {
             } else if (adapter.solana && typeof adapter.solana.connect === 'function') {
                 console.log('Trying Solflare via adapter.solana.connect()...');
                 response = await adapter.solana.connect();
+            } else if (window.solana && window.solana.isSolflare && typeof window.solana.connect === 'function') {
+                console.log('Trying Solflare via window.solana.connect()...');
+                response = await window.solana.connect();
             } else {
+                console.error('Available adapter methods:', Object.getOwnPropertyNames(adapter));
                 throw new Error('No supported Solflare connection method found');
             }
             
@@ -314,82 +320,126 @@ class WalletAdapterManager {
 
     // Extract Solflare-specific wallet address
     extractSolflareAddress(response) {
-        console.log('Extracting Solflare address from response:', response);
+        console.log('=== SOLFLARE ADDRESS EXTRACTION DEBUG ===');
+        console.log('Full response object:', JSON.stringify(response, null, 2));
+        console.log('Response type:', typeof response);
+        console.log('Response constructor:', response?.constructor?.name);
+        console.log('Response prototype:', Object.getPrototypeOf(response));
         
-        let walletAddress;
-        
-        // Try all possible Solflare response formats
-        if (response.publicKey) {
-            walletAddress = response.publicKey.toString();
-            console.log('Found publicKey:', walletAddress);
-        } else if (response.pubkey) {
-            walletAddress = response.pubkey.toString();
-            console.log('Found pubkey:', walletAddress);
-        } else if (response.address) {
-            walletAddress = response.address;
-            console.log('Found address:', walletAddress);
-        } else if (response.account) {
-            walletAddress = response.account;
-            console.log('Found account:', walletAddress);
-        } else if (response.accounts && response.accounts[0]) {
-            walletAddress = response.accounts[0];
-            console.log('Found accounts[0]:', walletAddress);
-        } else if (response.data && response.data.publicKey) {
-            walletAddress = response.data.publicKey.toString();
-            console.log('Found data.publicKey:', walletAddress);
-        } else if (response.result && response.result.publicKey) {
-            walletAddress = response.result.publicKey.toString();
-            console.log('Found result.publicKey:', walletAddress);
-        } else if (response.data && response.data.address) {
-            walletAddress = response.data.address;
-            console.log('Found data.address:', walletAddress);
-        } else if (response.result && response.result.address) {
-            walletAddress = response.result.address;
-            console.log('Found result.address:', walletAddress);
-        } else if (typeof response === 'string') {
-            walletAddress = response;
-            console.log('Found string response:', walletAddress);
-        } else if (response && typeof response === 'object') {
-            // Deep search for any property that looks like a Solana address
-            console.log('Performing deep search for Solana address...');
-            walletAddress = this.findSolanaAddressInObject(response);
-            if (walletAddress) {
-                console.log('Found address in deep search:', walletAddress);
+        // Log all response properties
+        if (response && typeof response === 'object') {
+            console.log('Response properties:', Object.getOwnPropertyNames(response));
+            console.log('Response keys:', Object.keys(response));
+            for (const key in response) {
+                console.log(`  ${key}:`, response[key], `(${typeof response[key]})`);
             }
         }
         
+        let walletAddress;
+        
+        // Try all possible Solflare response formats with enhanced logging
+        if (response && response.publicKey) {
+            console.log('✓ Found response.publicKey:', response.publicKey);
+            if (typeof response.publicKey.toString === 'function') {
+                walletAddress = response.publicKey.toString();
+                console.log('✓ Converted publicKey to string:', walletAddress);
+            } else if (typeof response.publicKey === 'string') {
+                walletAddress = response.publicKey;
+                console.log('✓ publicKey is already string:', walletAddress);
+            }
+        } else if (response && response.pubkey) {
+            console.log('✓ Found response.pubkey:', response.pubkey);
+            walletAddress = typeof response.pubkey.toString === 'function' ? response.pubkey.toString() : response.pubkey;
+        } else if (response && response.address) {
+            console.log('✓ Found response.address:', response.address);
+            walletAddress = response.address;
+        } else if (response && response.account) {
+            console.log('✓ Found response.account:', response.account);
+            walletAddress = response.account;
+        } else if (response && response.accounts && response.accounts[0]) {
+            console.log('✓ Found response.accounts[0]:', response.accounts[0]);
+            walletAddress = response.accounts[0];
+        } else if (response && response.data && response.data.publicKey) {
+            console.log('✓ Found response.data.publicKey:', response.data.publicKey);
+            walletAddress = typeof response.data.publicKey.toString === 'function' ? response.data.publicKey.toString() : response.data.publicKey;
+        } else if (response && response.result && response.result.publicKey) {
+            console.log('✓ Found response.result.publicKey:', response.result.publicKey);
+            walletAddress = typeof response.result.publicKey.toString === 'function' ? response.result.publicKey.toString() : response.result.publicKey;
+        } else if (response && response.data && response.data.address) {
+            console.log('✓ Found response.data.address:', response.data.address);
+            walletAddress = response.data.address;
+        } else if (response && response.result && response.result.address) {
+            console.log('✓ Found response.result.address:', response.result.address);
+            walletAddress = response.result.address;
+        } else if (typeof response === 'string') {
+            console.log('✓ Response is string:', response);
+            walletAddress = response;
+        } else if (response && typeof response === 'object') {
+            // Enhanced deep search with detailed logging
+            console.log('🔍 Performing enhanced deep search for Solana address...');
+            walletAddress = this.findSolanaAddressInObject(response);
+            if (walletAddress) {
+                console.log('✓ Found address in deep search:', walletAddress);
+            } else {
+                console.log('❌ Deep search failed to find valid address');
+            }
+        }
+        
+        console.log('Final extracted wallet address:', walletAddress);
+        
         if (!walletAddress) {
-            console.error('Could not extract Solflare wallet address. Response:', response);
+            console.error('❌ SOLFLARE ADDRESS EXTRACTION FAILED');
+            console.error('Response was:', response);
+            console.error('Available properties:', response ? Object.keys(response) : 'none');
             throw new Error('Could not extract wallet address from Solflare response');
         }
         
         // Validate the address format
+        console.log('Validating address format:', walletAddress);
         if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(walletAddress)) {
-            console.error('Invalid Solana address format:', walletAddress);
+            console.error('❌ Invalid Solana address format:', walletAddress);
+            console.error('Address length:', walletAddress.length);
+            console.error('Address characters:', walletAddress.split(''));
             throw new Error('Invalid wallet address format received from Solflare');
         }
         
+        console.log('✅ Solflare address extraction successful:', walletAddress);
         return walletAddress;
     }
 
-    // Deep search for Solana address in object
+    // Enhanced deep search for Solana address in object
     findSolanaAddressInObject(obj, depth = 0) {
-        if (depth > 3) return null; // Prevent infinite recursion
+        if (depth > 3) {
+            console.log(`🔍 Stopping deep search at depth ${depth} to prevent infinite recursion`);
+            return null;
+        }
+        
+        console.log(`🔍 Deep search at depth ${depth}, object:`, obj);
         
         for (const key in obj) {
             const value = obj[key];
+            console.log(`🔍 Checking key "${key}":`, value, `(${typeof value})`);
             
             if (value && typeof value === 'string' && value.length >= 32 && value.length <= 44) {
+                console.log(`🔍 Found string with valid length: "${value}"`);
                 // Check if it looks like a Solana address
                 if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) {
+                    console.log(`✅ Found valid Solana address: ${value}`);
                     return value;
+                } else {
+                    console.log(`❌ String doesn't match Solana address pattern: ${value}`);
                 }
             } else if (value && typeof value === 'object' && depth < 3) {
+                console.log(`🔍 Recursing into object at key "${key}"`);
                 const found = this.findSolanaAddressInObject(value, depth + 1);
-                if (found) return found;
+                if (found) {
+                    console.log(`✅ Found address in nested object: ${found}`);
+                    return found;
+                }
             }
         }
         
+        console.log(`❌ No valid address found at depth ${depth}`);
         return null;
     }
 
