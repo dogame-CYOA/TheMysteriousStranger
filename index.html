@@ -146,14 +146,13 @@
         }
         .inventory-status {
             position: absolute;
-            top: 5px;
-            right: 5px;
-            background: #444;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
             color: #bfa76a;
-            padding: 3px 8px;
+            padding: 5px 10px;
             border-radius: 4px;
-            font-size: 0.7em;
-            border: 1px solid #bfa76a;
+            font-size: 0.9em;
             z-index: 10;
             max-width: 80px;
             text-align: center;
@@ -161,30 +160,16 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .wallet-selector {
-            margin: 15px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .wallet-option {
-            background: #444;
-            color: #bfa76a;
-            border: 2px solid #bfa76a;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        .wallet-option:hover {
-            background: #bfa76a;
-            color: #222;
-        }
-        .wallet-option.installed {
-            background: #28a745;
-            border-color: #28a745;
-            color: white;
+
+        .textbox {
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 50px 20px 20px;
+            border-radius: 8px;
+            margin: 20px;
+            position: relative;
+            font-size: 1.1em;
+            line-height: 1.6;
         }
         @media (max-width: 800px) {
             .game-frame { 
@@ -266,7 +251,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Scene 1 -->
         <div id="scene1" class="scene">
             <div class="artwork-container">
@@ -632,6 +617,7 @@
                         await secureStore('nft_session_token', sessionData);
                         
                         console.log('Authenticated session active - full access');
+                        
                         showScene(0); // Full access to the game
                         return true;
                     }
@@ -800,9 +786,7 @@
                     
                     messageDiv.innerHTML = '<div class="success">Wallet verified and NFT ownership confirmed! Welcome, adventurer.</div>';
                     
-                    setTimeout(() => {
-                        showScene(0);
-                    }, 2000);
+                    showScene(0);
                 } else {
                     messageDiv.innerHTML = `<div class="error">Verification failed: ${verifyData.error}</div>`;
                     updateWalletStatus('Wallet connected but verification failed', false);
