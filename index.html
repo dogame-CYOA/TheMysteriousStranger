@@ -995,13 +995,13 @@
             extra.innerHTML = '';
             if (Math.floor(Math.random()*6) === 0) {
                 document.getElementById('scene4-text').innerText =
-                    "You listen closely and use your key to quietly unlock the door. Suddenly you hear shuffling and guttural whispers on the other side. Before you can react, the door bursts open from the inside!";
+                    "You listen closely and use your key to quietly unlock the door. Suddenly you hear shuffling and guttural whispers on the other side. The door bursts open!";
                 document.getElementById('scene4-choices').style.display = 'none';
                 extra.style.display = '';
                 extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Stand your ground and fight</button> <button class='choice-btn' onclick='showScene(1)'>This is too scary, run back to the stranger</button>`;
             } else {
                 document.getElementById('scene4-text').innerText =
-                    "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door. Gathering your courage, you decide to go in.";
+                    "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door. You decide to go in.";
                 document.getElementById('scene4-choices').style.display = 'none';
                 extra.style.display = '';
                 extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Enter the cave quietly</button>`;
