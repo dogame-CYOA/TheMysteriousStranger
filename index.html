@@ -431,7 +431,7 @@
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory11"></div>
-                The stranger's eyes light up with joy as you present the pocket watch. "You found it! This is worth more than all the gold in that cave to me," he exclaims, clutching the watch to his chest.
+                The stranger's eyes light up with joy as you present the pocket watch and return his ornate key. "You found it! This is worth more than all the gold in that cave to me," he exclaims, clutching the watch to his chest.
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(0)">Return to the beginning</button>
                 </div>
@@ -929,6 +929,12 @@
             
             // Reset key status when returning to main page (scene 0)
             if (num === 0) {
+                hasKey = false;
+                acceptedQuest = false;
+            }
+            
+            // Reset key status when completing the quest (scene 11)
+            if (num === 11) {
                 hasKey = false;
                 acceptedQuest = false;
             }
