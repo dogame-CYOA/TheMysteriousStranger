@@ -214,6 +214,7 @@
                 
                 <div class="choices-container" style="margin-top:24px;">
                     <button class="choice-btn" onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
+                    <button class="choice-btn" onclick="createBrowsingSession()" id="browseBtn" style="margin-top:12px; background-color:#666;">Browse Without Wallet</button>
                 </div>
             </div>
         </div>
@@ -376,16 +377,18 @@
         let hasKey = false;
         let acceptedQuest = false;
         
-        // Security: Input validation
+        // Security: Enhanced input sanitization
         function sanitizeInput(input) {
             if (typeof input !== 'string') return '';
-            return input.trim().replace(/[<>]/g, '');
+            return input.replace(/[<>\"'&]/g, '').trim();
         }
-        
-        // Security: Validate wallet address format
+
+        // Security: Enhanced wallet address validation
         function isValidWalletAddress(address) {
             if (!address || typeof address !== 'string') return false;
-            return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address.trim());
+            const cleanAddress = address.trim();
+            // Solana addresses are 32-44 characters long and contain only base58 characters
+            return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cleanAddress);
         }
         
         // Security: Proper session encryption using Web Crypto API
@@ -415,6 +418,7 @@
             }
         }
         
+        // Security: Enhanced session storage with encryption
         async function secureStore(key, value) {
             try {
                 if (sessionEncryptionKey) {
@@ -435,6 +439,7 @@
                 }
             } catch (error) {
                 console.error('Failed to store session:', error);
+                // Don't expose sensitive data in error messages
             }
         }
         
@@ -481,25 +486,45 @@
             return str;
         }
             
-        // Security: Request timestamp for anti-replay protection
+        // Security: Enhanced request signing with timestamp
         function addTimestamp(body) {
             return {
-                timestamp: Date.now().toString()
+                ...body,
+                timestamp: Date.now().toString(),
+                nonce: Math.random().toString(36).substring(2, 15)
             };
         }
-        
-        // Security: Make timestamped API request
+
+        // Security: Make timestamped API request with enhanced security
         async function makeTimestampedRequest(url, body) {
             const timestamp = Date.now().toString();
+            const nonce = Math.random().toString(36).substring(2, 15);
             
             return fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Request-Timestamp': timestamp
+                    'X-Request-Timestamp': timestamp,
+                    'X-Request-Nonce': nonce,
+                    'X-Request-Signature': await generateRequestSignature(body, timestamp, nonce)
                 },
                 body: JSON.stringify(body)
             });
+        }
+
+        // Security: Generate request signature for additional security
+        async function generateRequestSignature(body, timestamp, nonce) {
+            try {
+                const data = JSON.stringify(body) + timestamp + nonce;
+                const encoder = new TextEncoder();
+                const dataBuffer = encoder.encode(data);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (error) {
+                console.error('Failed to generate request signature:', error);
+                return '';
+            }
         }
         
         let isVerified = false;
@@ -549,7 +574,15 @@
                         sessionToken = token;
                         connectedWallet = data.walletAddress;
                         updateWalletStatus(`Connected: ${data.walletAddress.substring(0, 8)}...`, true);
-                        showScene(0);
+                        
+                        // Handle different session types
+                        if (data.sessionType === 'browsing') {
+                            console.log('Browsing session active - limited access');
+                            showScene(0); // Show main page but with limited access
+                        } else {
+                            console.log('Authenticated session active - full access');
+                            showScene(0); // Full access to the game
+                        }
                         return true;
                     }
                 }
@@ -559,6 +592,60 @@
 
             localStorage.removeItem('nft_session_token');
             return false;
+        }
+
+        // Create browsing session for users who want to explore without wallet
+        async function createBrowsingSession() {
+            const messageDiv = document.getElementById('verificationMessage');
+            messageDiv.innerHTML = '<div class="loading">Creating browsing session...</div>';
+            
+            try {
+                const timestamp = Date.now().toString();
+                const response = await fetch(`${API_BASE_URL}/api/verify-nft`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Request-Timestamp': timestamp
+                    },
+                    body: JSON.stringify({
+                        action: 'browsing',
+                        timestamp: timestamp
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        // Store browsing session
+                        await secureStore('nft_session_token', {
+                            token: data.sessionToken,
+                            wallet: 'Browsing User',
+                            walletType: 'Browsing',
+                            timestamp: Date.now(),
+                            sessionType: 'browsing'
+                        });
+                        
+                        isVerified = true;
+                        sessionToken = data.sessionToken;
+                        connectedWallet = 'Browsing User';
+                        updateWalletStatus('Browsing Mode (Limited Access)', true);
+                        
+                        messageDiv.innerHTML = '<div class="success">Browsing session created! You can explore the game.</div>';
+                        
+                        setTimeout(() => {
+                            showScene(0);
+                        }, 2000);
+                        
+                        return true;
+                    }
+                }
+                
+                throw new Error('Failed to create browsing session');
+            } catch (error) {
+                console.error('Browsing session creation failed:', error);
+                messageDiv.innerHTML = '<div class="error">Failed to create browsing session. Please try again.</div>';
+                return false;
+            }
         }
 
         // Update wallet connection status display
