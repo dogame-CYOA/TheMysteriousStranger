@@ -29,7 +29,7 @@
             padding: 0;
             margin: 0 auto;
             box-sizing: border-box;
-            overflow: hidden;
+            overflow: visible;
         }
         .artwork-container {
             width: 100%;
@@ -69,6 +69,7 @@
             padding: 50px 18px 10px 18px; /* Increased top padding for mobile */
             min-height: 90px;
             position: relative;
+            overflow: visible;
         }
         .choices-container {
             margin-top: 12px;
@@ -77,6 +78,7 @@
             gap: 10px;
             width: 100%;
             align-items: center;
+            margin-bottom: 10px;
         }
         .choice-btn {
             background: #bfa76a;
@@ -173,6 +175,7 @@
             position: relative;
             font-size: 1.1em;
             line-height: 1.6;
+            overflow: visible;
         }
         @media (max-width: 800px) {
             .game-frame { 
@@ -233,6 +236,7 @@
             .textbox {
                 padding: 45px 15px 15px 15px;
                 font-size: 1em;
+                overflow: visible;
             }
         }
     </style>
