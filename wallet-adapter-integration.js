@@ -1,27 +1,8 @@
 // Complete Wallet Adapter Integration for The Mysterious Stranger
-// This replaces manual wallet detection with the official Solana Wallet Adapter
-
-import { Connection, PublicKey } from '@solana/web3.js';
-import { 
-    PhantomWalletAdapter,
-    SolflareWalletAdapter,
-    BackpackWalletAdapter,
-    SlopeWalletAdapter,
-    GlowWalletAdapter
-} from '@solana/wallet-adapter-wallets';
+// Browser-compatible version - no ES6 imports required
 
 // Configuration
 const SOLANA_RPC_ENDPOINT = 'https://api.mainnet-beta.solana.com';
-const connection = new Connection(SOLANA_RPC_ENDPOINT);
-
-// Initialize wallet adapters
-const wallets = [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-    new BackpackWalletAdapter(),
-    new SlopeWalletAdapter(),
-    new GlowWalletAdapter()
-];
 
 // Complete wallet adapter manager
 class WalletAdapterManager {
@@ -35,37 +16,71 @@ class WalletAdapterManager {
 
     // Initialize all wallet adapters
     initializeAdapters() {
-        wallets.forEach(wallet => {
-            // Set up disconnect listeners
-            wallet.on('disconnect', () => {
-                this.handleDisconnect();
+        // Check for available wallets in the browser
+        this.availableWallets = this.detectAvailableWallets();
+        console.log('Available wallets detected:', this.availableWallets.map(w => w.name));
+    }
+
+    // Detect available wallets in the browser
+    detectAvailableWallets() {
+        const wallets = [];
+        
+        // Check for Phantom
+        if (window.solana && window.solana.isPhantom) {
+            wallets.push({
+                name: 'Phantom',
+                adapter: window.solana,
+                readyState: 'Installed'
             });
-            
-            // Set up connect listeners
-            wallet.on('connect', () => {
-                if (wallet.connected && wallet.publicKey) {
-                    this.connectedWallet = wallet.publicKey.toString();
-                    this.connectedAdapter = wallet;
-                    this.notifyListeners('connected', {
-                        wallet: wallet.name,
-                        address: this.connectedWallet
-                    });
-                }
+        }
+        
+        // Check for Solflare
+        if (window.solflare) {
+            wallets.push({
+                name: 'Solflare',
+                adapter: window.solflare,
+                readyState: 'Installed'
             });
-        });
+        }
+        
+        // Check for Backpack
+        if (window.backpack) {
+            wallets.push({
+                name: 'Backpack',
+                adapter: window.backpack,
+                readyState: 'Installed'
+            });
+        }
+        
+        // Check for Slope
+        if (window.solana && window.solana.isSlope) {
+            wallets.push({
+                name: 'Slope',
+                adapter: window.solana,
+                readyState: 'Installed'
+            });
+        }
+        
+        // Check for Glow
+        if (window.solana && window.solana.isGlow) {
+            wallets.push({
+                name: 'Glow',
+                adapter: window.solana,
+                readyState: 'Installed'
+            });
+        }
+        
+        return wallets;
     }
 
     // Get available wallets
     getAvailableWallets() {
-        return wallets.filter(wallet => 
-            wallet.readyState === 'Installed' || 
-            wallet.readyState === 'Loadable'
-        );
+        return this.availableWallets;
     }
 
     // Get wallet by name
     getWalletByName(name) {
-        return wallets.find(w => w.name === name);
+        return this.availableWallets.find(w => w.name === name);
     }
 
     // Connect to a specific wallet
@@ -85,23 +100,49 @@ class WalletAdapterManager {
             console.log(`Attempting to connect to ${walletName}...`);
             
             // Connect to wallet
-            await wallet.connect();
-            
-            if (wallet.connected && wallet.publicKey) {
-                this.connectedWallet = wallet.publicKey.toString();
-                this.connectedAdapter = wallet;
-                
-                console.log(`Successfully connected to ${walletName}: ${this.connectedWallet.substring(0, 8)}...`);
-                
-                return {
-                    success: true,
-                    wallet: walletName,
-                    address: this.connectedWallet,
-                    adapter: wallet
-                };
-            } else {
-                throw new Error('Failed to connect to wallet');
+            let response;
+            try {
+                response = await wallet.adapter.connect();
+            } catch (error) {
+                // Handle different connection methods for mobile wallets
+                if (typeof wallet.adapter.request === 'function') {
+                    response = await wallet.adapter.request({ method: 'connect' });
+                } else if (typeof wallet.adapter.enable === 'function') {
+                    response = await wallet.adapter.enable();
+                } else {
+                    throw error;
+                }
             }
+            
+            // Extract wallet address
+            let walletAddress;
+            if (response.publicKey) {
+                walletAddress = response.publicKey.toString();
+            } else if (response.pubkey) {
+                walletAddress = response.pubkey.toString();
+            } else if (response.address) {
+                walletAddress = response.address;
+            } else if (response.account) {
+                walletAddress = response.account;
+            } else if (response.accounts && response.accounts[0]) {
+                walletAddress = response.accounts[0];
+            } else if (typeof response === 'string') {
+                walletAddress = response;
+            } else {
+                throw new Error('Could not extract wallet address from response');
+            }
+            
+            this.connectedWallet = walletAddress;
+            this.connectedAdapter = wallet.adapter;
+            
+            console.log(`Successfully connected to ${walletName}: ${this.connectedWallet.substring(0, 8)}...`);
+            
+            return {
+                success: true,
+                wallet: walletName,
+                address: this.connectedWallet,
+                adapter: wallet.adapter
+            };
         } catch (error) {
             console.error(`Wallet connection error (${walletName}):`, error);
             throw error;
@@ -125,14 +166,32 @@ class WalletAdapterManager {
 
     // Sign message using wallet adapter
     async signMessage(message) {
-        if (!this.connectedAdapter || !this.connectedAdapter.connected) {
+        if (!this.connectedAdapter) {
             throw new Error('No wallet connected');
         }
 
         try {
             console.log('Signing message with wallet adapter...');
             const encodedMessage = new TextEncoder().encode(message);
-            const signature = await this.connectedAdapter.signMessage(encodedMessage);
+            
+            let signature;
+            
+            // Try different signing methods
+            if (typeof this.connectedAdapter.signMessage === 'function') {
+                try {
+                    const result = await this.connectedAdapter.signMessage(encodedMessage, 'utf8');
+                    signature = result.signature;
+                } catch (error) {
+                    console.log('UTF8 encoding failed, trying without...');
+                    const result = await this.connectedAdapter.signMessage(encodedMessage);
+                    signature = result.signature;
+                }
+            } else if (typeof this.connectedAdapter.sign === 'function') {
+                const result = await this.connectedAdapter.sign(encodedMessage);
+                signature = result.signature;
+            } else {
+                throw new Error('Wallet does not support message signing');
+            }
             
             // Convert signature to base58
             if (signature instanceof Uint8Array) {
@@ -150,7 +209,7 @@ class WalletAdapterManager {
 
     // Disconnect wallet
     disconnect() {
-        if (this.connectedAdapter) {
+        if (this.connectedAdapter && typeof this.connectedAdapter.disconnect === 'function') {
             this.connectedAdapter.disconnect();
         }
         this.handleDisconnect();
@@ -166,7 +225,7 @@ class WalletAdapterManager {
 
     // Get connection status
     isConnected() {
-        return this.connectedAdapter && this.connectedAdapter.connected;
+        return this.connectedAdapter && this.connectedWallet;
     }
 
     // Get connected wallet address
@@ -176,7 +235,11 @@ class WalletAdapterManager {
 
     // Get connected wallet name
     getConnectedWalletName() {
-        return this.connectedAdapter ? this.connectedAdapter.name : null;
+        if (!this.connectedAdapter) return null;
+        
+        // Find the wallet name by matching the adapter
+        const wallet = this.availableWallets.find(w => w.adapter === this.connectedAdapter);
+        return wallet ? wallet.name : 'Unknown';
     }
 
     // Event listener system
@@ -231,12 +294,12 @@ class WalletAdapterManager {
     // Check if a specific wallet is installed
     isWalletInstalled(walletName) {
         const wallet = this.getWalletByName(walletName);
-        return wallet && (wallet.readyState === 'Installed' || wallet.readyState === 'Loadable');
+        return wallet && wallet.readyState === 'Installed';
     }
 }
 
 // Create global instance
 const walletManager = new WalletAdapterManager();
 
-// Export for module usage
-export default walletManager; 
+// Make it globally available
+window.walletManager = walletManager; 
