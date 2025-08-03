@@ -9,19 +9,23 @@ const REQUIRED_NFT_ADDRESSES = [
   '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc'
 ];
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const AUTHENTICATED_SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours for authenticated users
+const BROWSING_SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 hours for browsing users
 const REQUEST_SIGNING_SECRET = process.env.REQUEST_SIGNING_SECRET || crypto.randomBytes(32).toString('hex');
 
-// Security: Rate limiting
+// Security: Enhanced rate limiting with different limits for different actions
 const rateLimitStore = new Map();
 const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes
 const MAX_REQUESTS_PER_WINDOW = 10;
+const MAX_CHALLENGE_REQUESTS = 5; // Stricter limit for challenge generation
+const MAX_BROWSING_REQUESTS = 3; // Very strict limit for browsing sessions
 
-// Simple in-memory session store
+// Security: Session and challenge management
 const activeSessions = new Map();
 const pendingChallenges = new Map();
+const failedAttempts = new Map(); // Track failed authentication attempts
 
-// Clean up expired sessions, challenges, and rate limits
+// Security: Clean up expired sessions, challenges, rate limits, and failed attempts
 setInterval(() => {
   const now = Date.now();
   for (const [token, session] of activeSessions.entries()) {
@@ -39,12 +43,17 @@ setInterval(() => {
       rateLimitStore.delete(key);
     }
   }
+  for (const [key, data] of failedAttempts.entries()) {
+    if (now > data.expires) {
+      failedAttempts.delete(key);
+    }
+  }
 }, 5 * 60 * 1000);
 
-// Security: Rate limiting function
-function checkRateLimit(identifier) {
+// Security: Enhanced rate limiting function with different limits
+function checkRateLimit(identifier, type = 'general') {
   const now = Date.now();
-  const key = `rate_limit_${identifier}`;
+  const key = `rate_limit_${type}_${identifier}`;
   const current = rateLimitStore.get(key) || { count: 0, expires: now + RATE_LIMIT_WINDOW };
   
   if (now > current.expires) {
@@ -55,7 +64,51 @@ function checkRateLimit(identifier) {
   }
   
   rateLimitStore.set(key, current);
-  return current.count <= MAX_REQUESTS_PER_WINDOW;
+  
+  // Different limits for different request types
+  let maxRequests;
+  switch (type) {
+    case 'challenge':
+      maxRequests = MAX_CHALLENGE_REQUESTS;
+      break;
+    case 'browsing':
+      maxRequests = MAX_BROWSING_REQUESTS;
+      break;
+    case 'verify':
+      maxRequests = MAX_REQUESTS_PER_WINDOW;
+      break;
+    default:
+      maxRequests = MAX_REQUESTS_PER_WINDOW;
+  }
+  
+  return current.count <= maxRequests;
+}
+
+// Security: Track failed authentication attempts
+function trackFailedAttempt(identifier) {
+  const now = Date.now();
+  const key = `failed_${identifier}`;
+  const current = failedAttempts.get(key) || { count: 0, expires: now + 15 * 60 * 1000 }; // 15 minute window
+  
+  if (now > current.expires) {
+    current.count = 1;
+    current.expires = now + 15 * 60 * 1000;
+  } else {
+    current.count++;
+  }
+  
+  failedAttempts.set(key, current);
+  return current.count;
+}
+
+// Security: Check if wallet is temporarily blocked due to too many failed attempts
+function isWalletBlocked(identifier) {
+  const key = `failed_${identifier}`;
+  const data = failedAttempts.get(key);
+  if (!data) return false;
+  
+  // Block after 5 failed attempts for 15 minutes
+  return data.count >= 5 && Date.now() < data.expires;
 }
 
 // Security: Request validation (timestamp-based anti-replay)
@@ -83,6 +136,15 @@ function generateSecureToken(walletAddress) {
   const data = `${walletAddress}-${timestamp}-${randomPart}`;
   const hash = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
   return `${Buffer.from(data).toString('base64')}.${hash}`;
+}
+
+// Security: Generate browsing session token (shorter duration)
+function generateBrowsingToken() {
+  const timestamp = Date.now();
+  const randomPart = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  const data = `browsing-${timestamp}-${randomPart}`;
+  const hash = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+  return `browsing_${Buffer.from(data).toString('base64')}.${hash}`;
 }
 
 // Security: Validate wallet address format
@@ -120,6 +182,9 @@ export default async function handler(req, res) {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://rpc.helius.xyz;");
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -167,7 +232,8 @@ export default async function handler(req, res) {
         success: true,
         valid: true,
         walletAddress: session.walletAddress.substring(0, 8) + '...',
-        expires: session.expires
+        expires: session.expires,
+        sessionType: session.type || 'authenticated'
       });
     } else {
       activeSessions.delete(token);
@@ -215,16 +281,26 @@ export default async function handler(req, res) {
         });
       }
       
-      // Security: Rate limiting per wallet
-      if (!checkRateLimit(`wallet_${walletAddress}`)) {
-        console.log(`[${requestId}] Rate limit exceeded for wallet: ${walletAddress.substring(0, 8)}...`);
+      const cleanWalletAddress = walletAddress.trim();
+      
+      // Security: Check if wallet is temporarily blocked
+      if (isWalletBlocked(cleanWalletAddress)) {
+        console.log(`[${requestId}] Wallet temporarily blocked due to failed attempts: ${cleanWalletAddress.substring(0, 8)}...`);
         return res.status(429).json({
           success: false,
-          error: 'Too many requests for this wallet. Please try again later.'
+          error: 'Too many failed attempts. Please try again in 15 minutes.'
         });
       }
       
-      const cleanWalletAddress = walletAddress.trim();
+      // Security: Rate limiting per wallet
+      if (!checkRateLimit(`wallet_${cleanWalletAddress}`, 'challenge')) {
+        console.log(`[${requestId}] Rate limit exceeded for wallet: ${cleanWalletAddress.substring(0, 8)}...`);
+        return res.status(429).json({
+          success: false,
+          error: 'Too many challenge requests for this wallet. Please try again later.'
+        });
+      }
+      
       console.log(`[${requestId}] Challenge generated for wallet: ${cleanWalletAddress.substring(0, 4)}...`);
       
       const challengeCode = generateChallenge();
@@ -234,13 +310,50 @@ export default async function handler(req, res) {
       pendingChallenges.set(challengeCode, {
         walletAddress: cleanWalletAddress,
         message,
-        expires: Date.now() + 5 * 60 * 1000
+        expires: Date.now() + 5 * 60 * 1000,
+        requestId: requestId
       });
       
       return res.status(200).json({
         success: true,
         challenge: challengeCode,
         message: message
+      });
+    }
+    
+    // Step 1.5: Create browsing session (no wallet required)
+    if (action === 'browsing') {
+      console.log(`[${requestId}] Creating browsing session`);
+      
+      // Security: Rate limiting for browsing sessions
+      if (!checkRateLimit(`browsing_${clientIP}`, 'browsing')) {
+        console.log(`[${requestId}] Rate limit exceeded for browsing sessions`);
+        return res.status(429).json({
+          success: false,
+          error: 'Too many browsing session requests. Please try again later.'
+        });
+      }
+      
+      // Generate browsing session token
+      const browsingToken = generateBrowsingToken();
+      const expires = Date.now() + BROWSING_SESSION_DURATION;
+      
+      // Store browsing session
+      activeSessions.set(browsingToken, {
+        walletAddress: 'browsing_user',
+        expires,
+        type: 'browsing',
+        createdAt: Date.now()
+      });
+      
+      console.log(`[${requestId}] Browsing session created, expires in ${BROWSING_SESSION_DURATION / (60 * 60 * 1000)} hours`);
+      
+      return res.status(200).json({
+        success: true,
+        sessionToken: browsingToken,
+        expires,
+        sessionType: 'browsing',
+        message: 'Browsing session created. You can explore the game but will need to authenticate with a wallet to access the full adventure.'
       });
     }
     
@@ -265,10 +378,29 @@ export default async function handler(req, res) {
       
       const cleanWalletAddress = walletAddress.trim();
       
+      // Security: Check if wallet is temporarily blocked
+      if (isWalletBlocked(cleanWalletAddress)) {
+        console.log(`[${requestId}] Wallet temporarily blocked due to failed attempts: ${cleanWalletAddress.substring(0, 8)}...`);
+        return res.status(429).json({
+          success: false,
+          error: 'Too many failed attempts. Please try again in 15 minutes.'
+        });
+      }
+      
+      // Security: Rate limiting for verification attempts
+      if (!checkRateLimit(`wallet_${cleanWalletAddress}`, 'verify')) {
+        console.log(`[${requestId}] Rate limit exceeded for wallet verification: ${cleanWalletAddress.substring(0, 8)}...`);
+        return res.status(429).json({
+          success: false,
+          error: 'Too many verification attempts. Please try again later.'
+        });
+      }
+      
       // Verify challenge exists and hasn't expired
       const challengeData = pendingChallenges.get(challenge);
       if (!challengeData) {
         console.log(`[${requestId}] Invalid or expired challenge`);
+        trackFailedAttempt(cleanWalletAddress);
         return res.status(400).json({
           success: false,
           error: 'Invalid or expired challenge'
@@ -277,9 +409,20 @@ export default async function handler(req, res) {
       
       if (challengeData.walletAddress !== cleanWalletAddress) {
         console.log(`[${requestId}] Wallet address mismatch in challenge`);
+        trackFailedAttempt(cleanWalletAddress);
         return res.status(400).json({
           success: false,
           error: 'Wallet address mismatch'
+        });
+      }
+      
+      // Security: Verify challenge was created by this request or within reasonable time
+      if (Math.abs(Date.now() - challengeData.expires + 5 * 60 * 1000) > 10 * 60 * 1000) {
+        console.log(`[${requestId}] Challenge too old`);
+        trackFailedAttempt(cleanWalletAddress);
+        return res.status(400).json({
+          success: false,
+          error: 'Challenge too old'
         });
       }
       
@@ -315,6 +458,7 @@ export default async function handler(req, res) {
         
         if (!isValid) {
           console.log(`[${requestId}] Invalid signature for wallet: ${cleanWalletAddress.substring(0, 4)}...`);
+          trackFailedAttempt(cleanWalletAddress);
           return res.status(401).json({
             success: false,
             error: 'Invalid signature'
@@ -322,13 +466,14 @@ export default async function handler(req, res) {
         }
       } catch (error) {
         console.error(`[${requestId}] Signature verification error`);
+        trackFailedAttempt(cleanWalletAddress);
         return res.status(401).json({
           success: false,
           error: 'Signature verification failed'
         });
       }
       
-      // Clean up used challenge
+      // Clean up used challenge immediately after successful verification
       pendingChallenges.delete(challenge);
       
       // Security: Use proxy to check NFT ownership (hides Helius API key)
@@ -368,13 +513,14 @@ export default async function handler(req, res) {
         if (hasRequiredNFT) {
           // Generate secure session token
           const sessionToken = generateSecureToken(cleanWalletAddress);
-          const expires = Date.now() + SESSION_DURATION;
+          const expires = Date.now() + AUTHENTICATED_SESSION_DURATION;
           // Store session
           activeSessions.set(sessionToken, {
             walletAddress: cleanWalletAddress,
             created: Date.now(),
             expires,
-            verified: true
+            verified: true,
+            type: 'authenticated'
           });
           console.log(`[${requestId}] Wallet verified successfully: ${cleanWalletAddress.substring(0, 4)}...`);
           return res.status(200).json({
