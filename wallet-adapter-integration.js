@@ -234,8 +234,50 @@ class WalletAdapterManager {
             console.log('Response type:', typeof response);
             console.log('Response keys:', response ? Object.keys(response) : 'null');
             
+            // Special handling for Solflare's boolean response
+            let finalResponse = response;
+            
+            if (response === true) {
+                console.log('Solflare returned true - checking adapter for wallet data...');
+                
+                // When Solflare returns true, the wallet data is usually stored on the adapter
+                if (adapter.publicKey) {
+                    console.log('Found adapter.publicKey:', adapter.publicKey);
+                    finalResponse = { publicKey: adapter.publicKey };
+                } else if (adapter.solana && adapter.solana.publicKey) {
+                    console.log('Found adapter.solana.publicKey:', adapter.solana.publicKey);
+                    finalResponse = { publicKey: adapter.solana.publicKey };
+                } else if (window.solflare && window.solflare.publicKey) {
+                    console.log('Found window.solflare.publicKey:', window.solflare.publicKey);
+                    finalResponse = { publicKey: window.solflare.publicKey };
+                } else if (window.solana && window.solana.isSolflare && window.solana.publicKey) {
+                    console.log('Found window.solana.publicKey (Solflare):', window.solana.publicKey);
+                    finalResponse = { publicKey: window.solana.publicKey };
+                } else {
+                    // Try to get the connected account
+                    console.log('Trying to get connected account...');
+                    try {
+                        if (typeof adapter.getAccount === 'function') {
+                            const account = await adapter.getAccount();
+                            console.log('Got account from getAccount():', account);
+                            finalResponse = account;
+                        } else if (typeof adapter.getAccounts === 'function') {
+                            const accounts = await adapter.getAccounts();
+                            console.log('Got accounts from getAccounts():', accounts);
+                            if (accounts && accounts.length > 0) {
+                                finalResponse = { publicKey: accounts[0] };
+                            }
+                        }
+                    } catch (accountError) {
+                        console.log('Failed to get account:', accountError);
+                    }
+                }
+                
+                console.log('Final response after boolean handling:', finalResponse);
+            }
+            
             // Extract wallet address with comprehensive Solflare support
-            const walletAddress = this.extractSolflareAddress(response);
+            const walletAddress = this.extractSolflareAddress(finalResponse);
             
             this.connectedWallet = walletAddress;
             this.connectedAdapter = adapter;
