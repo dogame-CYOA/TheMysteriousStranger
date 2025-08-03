@@ -3,11 +3,22 @@ import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import crypto from 'crypto';
 
-// Configuration
-const REQUIRED_NFT_ADDRESSES = [
-  'Dh6isVXwKrNNamLjzQbFXkBKPdiLk4hGJVjfft6ZooLJ',
-  '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc'
-];
+// Configuration - NFT addresses from environment variable for easy updates
+const REQUIRED_NFT_ADDRESSES = process.env.REQUIRED_NFT_ADDRESSES 
+  ? process.env.REQUIRED_NFT_ADDRESSES.split(',').map(addr => addr.trim())
+  : [
+      'Dh6isVXwKrNNamLjzQbFXkBKPdiLk4hGJVjfft6ZooLJ',
+      '44K6Cr5YvpZLdSrDbJmwRi74c2szTLRtvf5Gr8e5tdQc'
+    ];
+
+// Configuration - Specific wallet addresses from environment variable
+const ALLOWED_WALLET_ADDRESSES = process.env.ALLOWED_WALLET_ADDRESSES 
+  ? process.env.ALLOWED_WALLET_ADDRESSES.split(',').map(addr => addr.trim())
+  : [];
+
+// Log configuration for debugging (remove in production)
+console.log('Required NFT addresses:', REQUIRED_NFT_ADDRESSES);
+console.log('Allowed wallet addresses:', ALLOWED_WALLET_ADDRESSES);
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const AUTHENTICATED_SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours for authenticated users
 const REQUEST_SIGNING_SECRET = process.env.REQUEST_SIGNING_SECRET || crypto.randomBytes(32).toString('hex');
@@ -430,41 +441,61 @@ export default async function handler(req, res) {
       // Clean up used challenge immediately after successful verification
       pendingChallenges.delete(challenge);
       
-      // Security: Use proxy to check NFT ownership (hides Helius API key)
+      // Security: Check both wallet address whitelist and NFT ownership
       try {
-        console.log(`[${requestId}] Checking NFT ownership via proxy`);
+        console.log(`[${requestId}] Checking authentication requirements`);
+        
+        // Check 1: Is wallet address in allowed list?
+        const isWalletAllowed = ALLOWED_WALLET_ADDRESSES.length === 0 || 
+                               ALLOWED_WALLET_ADDRESSES.includes(cleanWalletAddress);
+        
+        console.log(`[${requestId}] Wallet allowed: ${isWalletAllowed}`);
+        
+        // Check 2: Does wallet own required NFT?
         let hasRequiredNFT = false;
-        for (const mintAddress of REQUIRED_NFT_ADDRESSES) {
-          const proxyUrl = `${req.headers.host ? `https://${req.headers.host}` : 'http://localhost:3000'}/api/proxy-nft-query`;
-          const proxyResponse = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              walletAddress: cleanWalletAddress,
-              nftMintAddress: mintAddress,
-              sessionToken: 'temp'
-            })
-          });
-          if (!proxyResponse.ok) {
-            console.error(`[${requestId}] Proxy response not ok: ${proxyResponse.status} ${proxyResponse.statusText}`);
-            continue;
+        if (REQUIRED_NFT_ADDRESSES.length > 0) {
+          console.log(`[${requestId}] Checking NFT ownership via proxy`);
+          for (const mintAddress of REQUIRED_NFT_ADDRESSES) {
+            const proxyUrl = `${req.headers.host ? `https://${req.headers.host}` : 'http://localhost:3000'}/api/proxy-nft-query`;
+            const proxyResponse = await fetch(proxyUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                walletAddress: cleanWalletAddress,
+                nftMintAddress: mintAddress,
+                sessionToken: 'temp'
+              })
+            });
+            if (!proxyResponse.ok) {
+              console.error(`[${requestId}] Proxy response not ok: ${proxyResponse.status} ${proxyResponse.statusText}`);
+              continue;
+            }
+            const responseText = await proxyResponse.text();
+            let proxyData;
+            try {
+              proxyData = JSON.parse(responseText);
+            } catch (parseError) {
+              console.error(`[${requestId}] Failed to parse proxy response:`, responseText.substring(0, 200));
+              continue;
+            }
+            if (proxyData.success && proxyData.hasNFT) {
+              hasRequiredNFT = true;
+              break;
+            }
           }
-          const responseText = await proxyResponse.text();
-          let proxyData;
-          try {
-            proxyData = JSON.parse(responseText);
-          } catch (parseError) {
-            console.error(`[${requestId}] Failed to parse proxy response:`, responseText.substring(0, 200));
-            continue;
-          }
-          if (proxyData.success && proxyData.hasNFT) {
-            hasRequiredNFT = true;
-            break;
-          }
+        } else {
+          // If no NFT requirements, consider it as "has NFT"
+          hasRequiredNFT = true;
         }
-        if (hasRequiredNFT) {
+        
+        console.log(`[${requestId}] Has required NFT: ${hasRequiredNFT}`);
+        
+        // Grant access if EITHER wallet is allowed OR has required NFT
+        const isAuthenticated = isWalletAllowed || hasRequiredNFT;
+        
+        if (isAuthenticated) {
           // Generate secure session token
           const sessionToken = generateSecureToken(cleanWalletAddress);
           const expires = Date.now() + AUTHENTICATED_SESSION_DURATION;
@@ -484,10 +515,23 @@ export default async function handler(req, res) {
             expires: expires
           });
         } else {
-          console.log(`[${requestId}] NFT not found for wallet: ${cleanWalletAddress.substring(0, 4)}...`);
+          console.log(`[${requestId}] Authentication failed for wallet: ${cleanWalletAddress.substring(0, 4)}...`);
+          
+          // Provide more specific error message
+          let errorMessage = 'Access denied. ';
+          if (ALLOWED_WALLET_ADDRESSES.length > 0 && REQUIRED_NFT_ADDRESSES.length > 0) {
+            errorMessage += 'Wallet not in allowed list and no required NFT found.';
+          } else if (ALLOWED_WALLET_ADDRESSES.length > 0) {
+            errorMessage += 'Wallet not in allowed list.';
+          } else if (REQUIRED_NFT_ADDRESSES.length > 0) {
+            errorMessage += 'Required NFT not found in wallet.';
+          } else {
+            errorMessage += 'No authentication requirements configured.';
+          }
+          
           return res.status(403).json({
             success: false,
-            error: 'Required NFT not found in wallet'
+            error: errorMessage
           });
         }
       } catch (error) {
