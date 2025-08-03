@@ -61,7 +61,7 @@
             font-family: 'Courier New', Courier, monospace;
             font-size: 1.18em;
             color: #222;
-            padding: 40px 18px 10px 18px; /* Increased top padding to make room for inventory status */
+            padding: 50px 18px 10px 18px; /* Increased top padding further for mobile */
             min-height: 90px;
             position: relative;
         }
@@ -146,15 +146,17 @@
         }
         .inventory-status {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 5px;
+            right: 5px;
             background: #444;
             color: #bfa76a;
-            padding: 5px 10px;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 0.8em;
+            font-size: 0.7em;
             border: 1px solid #bfa76a;
             z-index: 10;
+            max-width: 80px;
+            text-align: center;
         }
 
         @media (max-width: 800px) {
@@ -331,6 +333,34 @@
             <div class="textbox">
                 <div class="inventory-status" id="inventory7"></div>
                 Deep in the cave, you discover a magnificent treasure chest filled with gold coins and precious gems! The stranger's lost item was indeed valuable. You have completed your quest and earned both the key and this incredible reward.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(10)">Examine the treasure more closely</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scene 10 - Pocket Watch Discovery -->
+        <div id="scene10" class="scene">
+            <div class="artwork-container">
+                <img src="TREASURE.jpg" alt="Pocket watch with photo" class="artwork">
+            </div>
+            <div class="textbox">
+                <div class="inventory-status" id="inventory10"></div>
+                Among the glittering gold and jewels, you notice a beautiful pocket watch. Opening it carefully, you find a faded photograph inside - a woman holding a child. This must be what the stranger was looking for. You should return this to him.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(11)">Return to the stranger with the pocket watch</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scene 11 - Stranger's Joy -->
+        <div id="scene11" class="scene">
+            <div class="artwork-container">
+                <img src="REWARDKEY.jpg" alt="Joyous stranger" class="artwork">
+            </div>
+            <div class="textbox">
+                <div class="inventory-status" id="inventory11"></div>
+                The stranger's eyes light up with joy as you present the pocket watch. "You found it! This is worth more than all the gold in that cave to me," he exclaims, clutching the watch to his chest. "Good job! Onto the next adventure."
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(0)">Return to the beginning</button>
                 </div>
@@ -1111,6 +1141,12 @@
                 document.getElementById('scene'+num).classList.add('active');
             }
             
+            // Reset key status when returning to main page (scene 0)
+            if (num === 0) {
+                hasKey = false;
+                acceptedQuest = false;
+            }
+            
             // Update inventory display whenever scene changes
             updateInventory();
             
@@ -1144,6 +1180,13 @@
             acceptedQuest = false;
             updateInventory();
             showScene(0);
+        }
+
+        // Reset game state completely (for new adventures)
+        function resetGameState() {
+            hasKey = false;
+            acceptedQuest = false;
+            updateInventory();
         }
 
         // Scene 4 logic - only works if player has key
