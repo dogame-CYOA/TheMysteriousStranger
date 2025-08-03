@@ -427,13 +427,10 @@
         </div>
     </div>
 
-    <script type="module">
-        // Import wallet adapter manager
-        import walletManager from './wallet-adapter-integration.js';
-        
-        // Make wallet manager globally available
-        window.walletManager = walletManager;
-        
+    <!-- Load wallet adapter integration first -->
+    <script src="wallet-adapter-integration.js"></script>
+
+    <script>
         // API base URL - will work both locally and when deployed
         const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
             ? 'http://localhost:3000' 
@@ -663,13 +660,13 @@
 
         // Show available wallets for selection
         function showWalletSelector() {
-            const availableWallets = walletManager.getAvailableWallets();
+            const availableWallets = window.walletManager.getAvailableWallets();
             const walletSelector = document.getElementById('walletSelector');
             const walletOptions = document.getElementById('walletOptions');
             
             if (availableWallets.length === 0) {
                 // No wallets available, show installation links
-                const installationLinks = walletManager.getInstallationLinks();
+                const installationLinks = window.walletManager.getInstallationLinks();
                 walletOptions.innerHTML = `
                     <p>No supported wallets detected. Please install one of the following:</p>
                     ${Object.entries(installationLinks).map(([name, url]) => 
@@ -696,7 +693,7 @@
             messageDiv.innerHTML = `<div class="loading">Connecting to ${walletName}...</div>`;
 
             try {
-                const result = await walletManager.connectToWallet(walletName);
+                const result = await window.walletManager.connectToWallet(walletName);
                 
                 if (result.success) {
                     connectedWallet = result.address;
@@ -727,7 +724,7 @@
             messageDiv.innerHTML = '<div class="loading">Looking for wallets...</div>';
 
             try {
-                const availableWallets = walletManager.getAvailableWallets();
+                const availableWallets = window.walletManager.getAvailableWallets();
                 
                 if (availableWallets.length === 0) {
                     // Show wallet selector with installation links
@@ -772,7 +769,7 @@
                 messageDiv.innerHTML = '<div class="loading">Please sign the message in your wallet to verify ownership...</div>';
 
                 // Step 2: Sign the challenge message using wallet adapter
-                const signature = await walletManager.signMessage(challengeData.message);
+                const signature = await window.walletManager.signMessage(challengeData.message);
 
                 messageDiv.innerHTML = '<div class="loading">Verifying signature and checking NFT ownership...</div>';
 
@@ -794,7 +791,7 @@
                     await secureStore('nft_session_token', {
                         token: sessionToken,
                         wallet: connectedWallet.substring(0, 8) + '...',
-                        walletType: walletManager.getConnectedWalletName(),
+                        walletType: window.walletManager.getConnectedWalletName(),
                         timestamp: Date.now()
                     });
                     
@@ -970,7 +967,7 @@
             }
         }
 
-        // Make functions globally available
+        // Make functions globally available for onclick handlers
         window.connectWallet = connectWallet;
         window.connectToSpecificWallet = connectToSpecificWallet;
         window.showScene = showScene;
