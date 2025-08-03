@@ -571,6 +571,41 @@
         // Enhanced wallet detection function
         function detectWallet() {
             console.log('Detecting wallets...');
+            console.log('Available window objects:', Object.keys(window).filter(key => 
+                key.toLowerCase().includes('solana') || 
+                key.toLowerCase().includes('phantom') || 
+                key.toLowerCase().includes('solflare') || 
+                key.toLowerCase().includes('backpack') ||
+                key.toLowerCase().includes('ethereum')
+            ));
+            
+            // iOS Mobile Wallet Detection (check first)
+            if (window.solflare && typeof window.solflare.connect === 'function') {
+                console.log('Solflare mobile wallet detected via window.solflare');
+                return { provider: window.solflare, type: 'Solflare Mobile' };
+            }
+            
+            if (window.backpack && typeof window.backpack.connect === 'function') {
+                console.log('Backpack mobile wallet detected via window.backpack');
+                return { provider: window.backpack, type: 'Backpack Mobile' };
+            }
+            
+            if (window.phantom && typeof window.phantom.connect === 'function') {
+                console.log('Phantom mobile wallet detected via window.phantom');
+                return { provider: window.phantom, type: 'Phantom Mobile' };
+            }
+            
+            // iOS Web3 Provider Detection
+            if (window.ethereum) {
+                console.log('Ethereum provider detected, checking for Solana wallets...');
+                if (window.ethereum.isSolflare) {
+                    console.log('Solflare mobile wallet detected via ethereum provider');
+                    return { provider: window.ethereum, type: 'Solflare Mobile (Ethereum)' };
+                } else if (window.ethereum.isBackpack) {
+                    console.log('Backpack mobile wallet detected via ethereum provider');
+                    return { provider: window.ethereum, type: 'Backpack Mobile (Ethereum)' };
+                }
+            }
             
             // Check for Phantom first (most common)
             if (window.solana && window.solana.isPhantom) {
@@ -625,6 +660,15 @@
             if (window.solana && typeof window.solana.connect === 'function') {
                 console.log('Generic Solana wallet detected');
                 return { provider: window.solana, type: 'Solana' };
+            }
+            
+            // Generic fallback - look for any object with connect method
+            for (const key of Object.keys(window)) {
+                const obj = window[key];
+                if (obj && typeof obj === 'object' && typeof obj.connect === 'function') {
+                    console.log(`Generic wallet detected via window.${key}`);
+                    return { provider: obj, type: `Generic (${key})` };
+                }
             }
             
             console.log('No wallet detected');
