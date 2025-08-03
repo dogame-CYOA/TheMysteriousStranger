@@ -61,7 +61,7 @@
             font-family: 'Courier New', Courier, monospace;
             font-size: 1.18em;
             color: #222;
-            padding: 50px 18px 10px 18px; /* Increased top padding further for mobile */
+            padding: 50px 18px 10px 18px; /* Increased top padding for mobile */
             min-height: 90px;
             position: relative;
         }
@@ -158,7 +158,31 @@
             max-width: 80px;
             text-align: center;
         }
-
+        .wallet-selector {
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .wallet-option {
+            background: #444;
+            color: #bfa76a;
+            border: 2px solid #bfa76a;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .wallet-option:hover {
+            background: #bfa76a;
+            color: #222;
+        }
+        .wallet-option.installed {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
         @media (max-width: 800px) {
             .game-frame { 
                 width: 99vw; 
@@ -215,6 +239,11 @@
                 </div>
                 
                 <div id="verificationMessage"></div>
+                
+                <div id="walletSelector" class="wallet-selector" style="display:none;">
+                    <h3>Select a Wallet:</h3>
+                    <div id="walletOptions"></div>
+                </div>
                 
                 <div class="choices-container" style="margin-top:24px;">
                     <button class="choice-btn" onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
@@ -398,7 +427,13 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import wallet adapter manager
+        import walletManager from './wallet-adapter-integration.js';
+        
+        // Make wallet manager globally available
+        window.walletManager = walletManager;
+        
         // API base URL - will work both locally and when deployed
         const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
             ? 'http://localhost:3000' 
@@ -407,6 +442,9 @@
         // Game state variables
         let hasKey = false;
         let acceptedQuest = false;
+        let isVerified = false;
+        let sessionToken = null;
+        let connectedWallet = null;
         
         // Security: Enhanced input sanitization
         function sanitizeInput(input) {
@@ -498,25 +536,6 @@
             }
         }
         
-        // Simple base58 encoding function
-        function base58Encode(bytes) {
-            const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-            let num = 0n;
-            for (let i = 0; i < bytes.length; i++) {
-                num = num * 256n + BigInt(bytes[i]);
-            }
-            let str = '';
-            while (num > 0n) {
-                str = alphabet[Number(num % 58n)] + str;
-                num = num / 58n;
-            }
-            // Handle leading zeros
-            for (let i = 0; i < bytes.length && bytes[i] === 0; i++) {
-                str = '1' + str;
-            }
-            return str;
-        }
-            
         // Security: Enhanced request signing with timestamp
         function addTimestamp(body) {
             return {
@@ -557,11 +576,6 @@
                 return '';
             }
         }
-        
-        let isVerified = false;
-        let sessionToken = null;
-        let walletProvider = null;
-        let connectedWallet = null;
 
         // Update inventory display
         function updateInventory() {
@@ -640,8 +654,6 @@
             return false;
         }
 
-
-
         // Update wallet connection status display
         function updateWalletStatus(message, connected = false) {
             const statusDiv = document.getElementById('walletStatus');
@@ -649,367 +661,103 @@
             statusDiv.className = `wallet-status ${connected ? 'wallet-connected' : 'wallet-disconnected'}`;
         }
 
-        // Enhanced wallet detection function
-        function detectWallet() {
-            console.log('Detecting wallets...');
-            console.log('Available window objects:', Object.keys(window).filter(key => 
-                key.toLowerCase().includes('solana') || 
-                key.toLowerCase().includes('phantom') || 
-                key.toLowerCase().includes('solflare') || 
-                key.toLowerCase().includes('backpack') ||
-                key.toLowerCase().includes('ethereum')
-            ));
+        // Show available wallets for selection
+        function showWalletSelector() {
+            const availableWallets = walletManager.getAvailableWallets();
+            const walletSelector = document.getElementById('walletSelector');
+            const walletOptions = document.getElementById('walletOptions');
             
-            // iOS Mobile Wallet Detection (check first)
-            if (window.solflare && typeof window.solflare.connect === 'function') {
-                console.log('Solflare mobile wallet detected via window.solflare');
-                return { provider: window.solflare, type: 'Solflare Mobile' };
+            if (availableWallets.length === 0) {
+                // No wallets available, show installation links
+                const installationLinks = walletManager.getInstallationLinks();
+                walletOptions.innerHTML = `
+                    <p>No supported wallets detected. Please install one of the following:</p>
+                    ${Object.entries(installationLinks).map(([name, url]) => 
+                        `<a href="${url}" target="_blank" class="wallet-option">Install ${name}</a>`
+                    ).join('')}
+                `;
+            } else {
+                // Show available wallets
+                walletOptions.innerHTML = availableWallets.map(wallet => 
+                    `<button class="wallet-option installed" onclick="connectToSpecificWallet('${wallet.name}')">${wallet.name}</button>`
+                ).join('');
             }
             
-            if (window.backpack && typeof window.backpack.connect === 'function') {
-                console.log('Backpack mobile wallet detected via window.backpack');
-                return { provider: window.backpack, type: 'Backpack Mobile' };
-            }
-            
-            if (window.phantom && typeof window.phantom.connect === 'function') {
-                console.log('Phantom mobile wallet detected via window.phantom');
-                return { provider: window.phantom, type: 'Phantom Mobile' };
-            }
-            
-            // iOS Web3 Provider Detection
-            if (window.ethereum) {
-                console.log('Ethereum provider detected, checking for Solana wallets...');
-                if (window.ethereum.isSolflare) {
-                    console.log('Solflare mobile wallet detected via ethereum provider');
-                    return { provider: window.ethereum, type: 'Solflare Mobile (Ethereum)' };
-                } else if (window.ethereum.isBackpack) {
-                    console.log('Backpack mobile wallet detected via ethereum provider');
-                    return { provider: window.ethereum, type: 'Backpack Mobile (Ethereum)' };
-                }
-            }
-            
-            // Check for Phantom first (most common)
-            if (window.solana && window.solana.isPhantom) {
-                console.log('Phantom wallet detected');
-                return { provider: window.solana, type: 'Phantom' };
-            }
-            
-            // Check for Backpack - multiple detection methods
-            if (window.backpack && window.backpack.solana) {
-                console.log('Backpack wallet detected via window.backpack.solana');
-                return { provider: window.backpack.solana, type: 'Backpack' };
-            }
-            
-            if (window.backpack) {
-                console.log('Backpack wallet detected via window.backpack');
-                return { provider: window.backpack, type: 'Backpack' };
-            }
-            
-            if (window.solana && window.solana.isBackpack) {
-                console.log('Backpack wallet detected via window.solana.isBackpack');
-                return { provider: window.solana, type: 'Backpack' };
-            }
-            
-            // Check for Solflare - try multiple detection methods
-            if (window.solflare && window.solflare.solana) {
-                console.log('Solflare wallet detected via window.solflare.solana');
-                return { provider: window.solflare.solana, type: 'Solflare' };
-            }
-            
-            if (window.solflare) {
-                console.log('Solflare wallet detected via window.solflare');
-                return { provider: window.solflare, type: 'Solflare' };
-            }
-            
-            if (window.solana && window.solana.isSolflare) {
-                console.log('Solflare wallet detected via window.solana.isSolflare');
-                return { provider: window.solana, type: 'Solflare' };
-            }
-            
-            // Check for other wallets
-            if (window.solana && window.solana.isSlope) {
-                console.log('Slope wallet detected');
-                return { provider: window.solana, type: 'Slope' };
-            }
-            
-            if (window.solana && window.solana.isGlow) {
-                console.log('Glow wallet detected');
-                return { provider: window.solana, type: 'Glow' };
-            }
-            
-            // Generic Solana wallet (fallback)
-            if (window.solana && typeof window.solana.connect === 'function') {
-                console.log('Generic Solana wallet detected');
-                return { provider: window.solana, type: 'Solana' };
-            }
-            
-            // Generic fallback - look for any object with connect method
-            for (const key of Object.keys(window)) {
-                const obj = window[key];
-                if (obj && typeof obj === 'object' && typeof obj.connect === 'function') {
-                    console.log(`Generic wallet detected via window.${key}`);
-                    return { provider: obj, type: `Generic (${key})` };
-                }
-            }
-            
-            console.log('No wallet detected');
-            return null;
+            walletSelector.style.display = 'block';
         }
 
-        // Enhanced signing function for different wallets
-        async function signMessageWithWallet(walletInfo, message) {
-            const { provider, type } = walletInfo;
-            const encodedMessage = new TextEncoder().encode(message);
+        // Connect to a specific wallet
+        async function connectToSpecificWallet(walletName) {
+            const connectBtn = document.getElementById('connectBtn');
+            const messageDiv = document.getElementById('verificationMessage');
             
-            console.log(`[${type}] Attempting to sign message...`);
-            console.log(`[${type}] Provider object:`, provider);
-            console.log(`[${type}] Available methods:`, Object.getOwnPropertyNames(provider));
-            
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            messageDiv.innerHTML = `<div class="loading">Connecting to ${walletName}...</div>`;
+
             try {
-                let signature;
+                const result = await walletManager.connectToWallet(walletName);
                 
-                switch (type) {
-                    case 'Phantom':
-                        // Phantom uses standard signMessage
-                        if (typeof provider.signMessage === 'function') {
-                            const result = await provider.signMessage(encodedMessage, 'utf8');
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Phantom wallet does not support message signing');
-                        }
-                        break;
-                        
-                    case 'Backpack':
-                        // Backpack specific signing logic
-                        if (typeof provider.signMessage === 'function') {
-                            try {
-                                console.log(`[${type}] Trying standard signMessage with utf8...`);
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] UTF8 method failed, trying without encoding...`, error);
-                                try {
-                                    const result = await provider.signMessage(encodedMessage);
-                                    signature = result.signature;
-                                } catch (error2) {
-                                    console.log(`[${type}] Standard methods failed, trying alternative...`, error2);
-                                    // Some Backpack versions might use different method signatures
-                                    const result = await provider.signMessage(message);
-                                    signature = result.signature;
-                                }
-                            }
-                        } else if (typeof provider.sign === 'function') {
-                            console.log(`[${type}] Using provider.sign method...`);
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Backpack wallet does not support message signing');
-                        }
-                        break;
-                        
-                    case 'Solflare':
-                        // Solflare has different signing methods
-                        if (typeof provider.signMessage === 'function') {
-                            try {
-                                // Try the standard method first
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] Standard signMessage failed, trying alternative...`);
-                                // Try alternative method
-                                const result = await provider.signMessage(encodedMessage);
-                                signature = result.signature;
-                            }
-                        } else if (typeof provider.sign === 'function') {
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error('Solflare wallet does not support message signing');
-                        }
-                        break;
-                        
-                    case 'Slope':
-                    case 'Glow':
-                    case 'Solana':
-                    default:
-                        // Generic signing approach
-                        if (typeof provider.signMessage === 'function') {
-                            try {
-                                const result = await provider.signMessage(encodedMessage, 'utf8');
-                                signature = result.signature;
-                            } catch (error) {
-                                console.log(`[${type}] UTF8 encoding failed, trying without...`);
-                                const result = await provider.signMessage(encodedMessage);
-                                signature = result.signature;
-                            }
-                        } else if (typeof provider.sign === 'function') {
-                            const result = await provider.sign(encodedMessage);
-                            signature = result.signature;
-                        } else {
-                            throw new Error(`${type} wallet does not support message signing`);
-                        }
-                        break;
-                }
-                
-                console.log(`[${type}] Signing successful:`, signature);
-                
-                // Convert signature to base58 if it's a Uint8Array
-                if (signature instanceof Uint8Array) {
-                    return base58Encode(signature);
-                } else if (typeof signature === 'string') {
-                    return signature;
+                if (result.success) {
+                    connectedWallet = result.address;
+                    updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}... (${walletName})`, true);
+                    messageDiv.innerHTML = '<div class="loading">Wallet connected. Generating challenge...</div>';
+
+                    // Continue with challenge/verification process
+                    return await completeWalletVerification(connectBtn, messageDiv);
                 } else {
-                    throw new Error(`Unsupported signature format from ${type}`);
+                    throw new Error('Failed to connect to wallet');
                 }
-                
             } catch (error) {
-                console.error(`[${type}] Signing failed:`, error);
-                throw new Error(`Failed to sign message with ${type}: ${error.message}`);
+                console.error('Wallet connection failed:', error);
+                messageDiv.innerHTML = `<div class="error">Connection failed: ${error.message}</div>`;
+                updateWalletStatus('Connection failed', false);
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Wallet';
             }
         }
 
-        // Connect to Solana wallet
+        // Connect to Solana wallet using wallet adapter
         async function connectWallet() {
             const connectBtn = document.getElementById('connectBtn');
             const messageDiv = document.getElementById('verificationMessage');
             
             connectBtn.disabled = true;
             connectBtn.textContent = 'Connecting...';
-            messageDiv.innerHTML = '<div class="loading">Looking for wallet...</div>';
+            messageDiv.innerHTML = '<div class="loading">Looking for wallets...</div>';
 
             try {
-                // Detect wallet
-                const walletInfo = detectWallet();
+                const availableWallets = walletManager.getAvailableWallets();
                 
-                if (!walletInfo) {
-                    console.log('No wallet provider found.');
-                    messageDiv.innerHTML = '<div class="error">No Solana wallet detected. Please install a supported wallet like <a href="https://phantom.app/" target="_blank">Phantom</a>, <a href="https://solflare.com/" target="_blank">Solflare</a>, or <a href="https://backpack.app/" target="_blank">Backpack</a>.</div>';
+                if (availableWallets.length === 0) {
+                    // Show wallet selector with installation links
+                    showWalletSelector();
                     connectBtn.disabled = false;
                     connectBtn.textContent = 'Connect Wallet';
                     return;
                 }
 
-                const { provider, type } = walletInfo;
-                console.log(`Found ${type} wallet`);
-
-                // Connect to wallet with wallet-specific handling
-                let response;
-                try {
-                    console.log(`[${type}] Attempting to connect...`);
-                    console.log(`[${type}] Available methods:`, Object.getOwnPropertyNames(provider));
-                    
-                    // iOS Mobile wallet specific handling
-                    if (type.includes('Mobile')) {
-                        console.log(`[${type}] Using mobile wallet connection...`);
-                        
-                        // Add a small delay for mobile wallets to initialize
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Mobile wallets often have different connection methods
-                        if (typeof provider.connect === 'function') {
-                            console.log(`[${type}] Using connect() method`);
-                            try {
-                                response = await provider.connect();
-                            } catch (error) {
-                                console.log(`[${type}] Connect() failed, trying request()...`);
-                                if (typeof provider.request === 'function') {
-                                    response = await provider.request({ method: 'connect' });
-                                } else {
-                                    throw error;
-                                }
-                            }
-                        } else if (typeof provider.request === 'function') {
-                            // Some mobile wallets use request method
-                            console.log(`[${type}] Using request() method`);
-                            response = await provider.request({ method: 'connect' });
-                        } else if (typeof provider.enable === 'function') {
-                            // Some use enable method
-                            console.log(`[${type}] Using enable() method`);
-                            response = await provider.enable();
-                        } else if (typeof provider.getAccounts === 'function') {
-                            // Some mobile wallets use getAccounts
-                            console.log(`[${type}] Using getAccounts() method`);
-                            response = await provider.getAccounts();
-                        } else {
-                            console.error(`[${type}] No supported connection method found`);
-                            throw new Error('Mobile wallet does not support connection');
-                        }
-                    } else {
-                        // Desktop wallet connection
-                        console.log(`[${type}] Using desktop wallet connection`);
-                        response = await provider.connect();
-                    }
-                    
-                    console.log(`[${type}] Connection response:`, response);
-                    console.log(`[${type}] Response type:`, typeof response);
-                    console.log(`[${type}] Response keys:`, response ? Object.keys(response) : 'null');
-                } catch (connectError) {
-                    console.error(`[${type}] Wallet connection failed:`, connectError);
-                    
-                    // For mobile wallets, try alternative connection methods
-                    if (type.includes('Mobile') && (connectError.message.includes('Plugin Closed') || connectError.message.includes('Failed to connect'))) {
-                        console.log(`[${type}] Plugin closed error detected, trying alternative methods...`);
-                        
-                        // Wait a bit longer before retry
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        try {
-                            // Try different connection approaches for mobile
-                            if (typeof provider.request === 'function') {
-                                console.log(`[${type}] Trying request method with different parameters...`);
-                                response = await provider.request({ 
-                                    method: 'connect',
-                                    params: []
-                                });
-                            } else if (typeof provider.enable === 'function') {
-                                console.log(`[${type}] Trying enable method...`);
-                                response = await provider.enable();
-                            } else if (typeof provider.getAccounts === 'function') {
-                                console.log(`[${type}] Trying getAccounts method...`);
-                                response = await provider.getAccounts();
-                            } else {
-                                throw new Error('No alternative connection methods available');
-                            }
-                            
-                            console.log(`[${type}] Alternative connection successful:`, response);
-                        } catch (altError) {
-                            console.error(`[${type}] Alternative connection methods also failed:`, altError);
-                            throw new Error(`Failed to connect to ${type}. Please ensure the wallet app is open and try again.`);
-                        }
-                    } else {
-                        throw new Error(`Failed to connect to ${type}. Please try again.`);
-                    }
-                }
-                
-                // Extract wallet address from response
-                let rawWalletAddress;
-                if (response.publicKey) {
-                    rawWalletAddress = response.publicKey.toString();
-                } else if (response.pubkey) {
-                    rawWalletAddress = response.pubkey.toString();
-                } else if (response.address) {
-                    rawWalletAddress = response.address;
-                } else if (response.account) {
-                    rawWalletAddress = response.account;
-                } else if (response.accounts && response.accounts[0]) {
-                    rawWalletAddress = response.accounts[0];
-                } else if (typeof response === 'string') {
-                    rawWalletAddress = response;
+                if (availableWallets.length === 1) {
+                    // Only one wallet available, connect to it directly
+                    return await connectToSpecificWallet(availableWallets[0].name);
                 } else {
-                    console.error('Unexpected wallet response format:', response);
-                    throw new Error(`Unexpected response format from ${type}`);
+                    // Multiple wallets available, show selector
+                    showWalletSelector();
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect Wallet';
                 }
-                
-                // Validate wallet address
-                if (!isValidWalletAddress(rawWalletAddress)) {
-                    throw new Error('Invalid wallet address received from provider');
-                }
-                
-                connectedWallet = sanitizeInput(rawWalletAddress);
-                
-                updateWalletStatus(`Connected: ${connectedWallet.substring(0, 8)}... (${type})`, true);
-                messageDiv.innerHTML = '<div class="loading">Wallet connected. Generating challenge...</div>';
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                messageDiv.innerHTML = `<div class="error">Connection failed: ${error.message}</div>`;
+                updateWalletStatus('Connection failed', false);
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Wallet';
+            }
+        }
 
+        // Complete wallet verification process
+        async function completeWalletVerification(connectBtn, messageDiv) {
+            try {
                 // Step 1: Get challenge from server
                 const challengeResponse = await makeTimestampedRequest(`${API_BASE_URL}/api/verify-nft`, {
                     action: 'challenge',
@@ -1023,8 +771,8 @@
 
                 messageDiv.innerHTML = '<div class="loading">Please sign the message in your wallet to verify ownership...</div>';
 
-                // Step 2: Sign the challenge message
-                const signature = await signMessageWithWallet(walletInfo, challengeData.message);
+                // Step 2: Sign the challenge message using wallet adapter
+                const signature = await walletManager.signMessage(challengeData.message);
 
                 messageDiv.innerHTML = '<div class="loading">Verifying signature and checking NFT ownership...</div>';
 
@@ -1046,7 +794,7 @@
                     await secureStore('nft_session_token', {
                         token: sessionToken,
                         wallet: connectedWallet.substring(0, 8) + '...',
-                        walletType: type,
+                        walletType: walletManager.getConnectedWalletName(),
                         timestamp: Date.now()
                     });
                     
@@ -1063,13 +811,13 @@
                 }
 
             } catch (error) {
-                console.error('Wallet connection error:', error);
+                console.error('Wallet verification error:', error);
                 if (error.message.includes('User rejected') || error.message.includes('cancelled')) {
                     messageDiv.innerHTML = '<div class="error">Wallet connection cancelled by user.</div>';
                 } else {
-                    messageDiv.innerHTML = `<div class="error">Connection failed: ${error.message}</div>`;
+                    messageDiv.innerHTML = `<div class="error">Verification failed: ${error.message}</div>`;
                 }
-                updateWalletStatus('Connection failed', false);
+                updateWalletStatus('Verification failed', false);
                 connectBtn.disabled = false;
                 connectBtn.textContent = 'Connect Wallet';
             }
@@ -1222,6 +970,16 @@
             }
         }
 
+        // Make functions globally available
+        window.connectWallet = connectWallet;
+        window.connectToSpecificWallet = connectToSpecificWallet;
+        window.showScene = showScene;
+        window.restartStory = restartStory;
+        window.resetGameState = resetGameState;
+        window.enterCave = enterCave;
+        window.lookAround = lookAround;
+        window.acceptQuest = acceptQuest;
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
             await initializeEncryption();
@@ -1230,4 +988,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
