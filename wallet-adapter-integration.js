@@ -114,8 +114,12 @@ class WalletAdapterManager {
                 }
             }
             
-            // Extract wallet address
+            // Extract wallet address with enhanced Solflare support
             let walletAddress;
+            console.log(`[${walletName}] Connection response:`, response);
+            console.log(`[${walletName}] Response type:`, typeof response);
+            console.log(`[${walletName}] Response keys:`, response ? Object.keys(response) : 'null');
+            
             if (response.publicKey) {
                 walletAddress = response.publicKey.toString();
             } else if (response.pubkey) {
@@ -126,9 +130,30 @@ class WalletAdapterManager {
                 walletAddress = response.account;
             } else if (response.accounts && response.accounts[0]) {
                 walletAddress = response.accounts[0];
+            } else if (response.data && response.data.publicKey) {
+                // Solflare specific format
+                walletAddress = response.data.publicKey.toString();
+            } else if (response.result && response.result.publicKey) {
+                // Alternative Solflare format
+                walletAddress = response.result.publicKey.toString();
             } else if (typeof response === 'string') {
                 walletAddress = response;
-            } else {
+            } else if (response && typeof response === 'object') {
+                // Try to find any property that looks like a public key
+                for (const key in response) {
+                    const value = response[key];
+                    if (value && typeof value === 'string' && value.length >= 32 && value.length <= 44) {
+                        // Check if it looks like a Solana address
+                        if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) {
+                            walletAddress = value;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!walletAddress) {
+                console.error(`[${walletName}] Could not extract wallet address. Response:`, response);
                 throw new Error('Could not extract wallet address from response');
             }
             
