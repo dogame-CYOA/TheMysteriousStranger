@@ -313,10 +313,12 @@
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory1"></div>
-                The sun is low as you walk the lonely road. In the distance you see a man standing still gripping a long spear. Something about his posture makes you pause.
+                <span id="scene1-text">
+                    The sun is low as you walk the lonely road. In the distance you see a man standing still gripping a long spear. Something about his posture makes you pause.
+                </span>
                 <div class="choices-container">
                     <button class="choice-btn" onclick="showScene(2)">Approach the man</button>
-                    <button class="choice-btn" onclick="showScene(8)">Avoid him and continue down the path</button>
+                    <button class="choice-btn" onclick="avoidStranger()">Avoid him and continue down the path</button>
                 </div>
             </div>
         </div>
@@ -475,10 +477,9 @@
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory9"></div>
-                You search around the cave entrance, looking for another way in or perhaps a hidden key. After thoroughly examining every rock and crevice, you find nothing. The door remains stubbornly locked.
+                You search around the cave entrance, looking for another way in or perhaps a hidden key. After thoroughly examining every rock and crevice, you find nothing. The door remains stubbornly locked. You realize you should have trusted the stranger's offer of help.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(1)">Return to find the stranger with the spear</button>
-                    <button class="choice-btn" onclick="restartStory()">Give up and start your journey over</button>
+                    <button class="choice-btn" onclick="returnToStranger()">Return to find the stranger with the spear</button>
                 </div>
             </div>
         </div>
@@ -499,6 +500,7 @@
         let isVerified = false;
         let sessionToken = null;
         let connectedWallet = null;
+        let initiallyAvoidedStranger = false;
         
         // Security: Enhanced input sanitization
         function sanitizeInput(input) {
@@ -946,12 +948,24 @@
             if (num === 0) {
                 hasKey = false;
                 acceptedQuest = false;
+                initiallyAvoidedStranger = false;
             }
             
             // Reset key status when completing the quest (scene 11)
             if (num === 11) {
                 hasKey = false;
                 acceptedQuest = false;
+                initiallyAvoidedStranger = false;
+            }
+            
+            // Handle Scene 1 dynamic text based on whether player initially avoided stranger
+            if (num === 1) {
+                const scene1Text = document.getElementById('scene1-text');
+                if (initiallyAvoidedStranger) {
+                    scene1Text.innerText = "You return to the lonely road where you first saw the man with the spear. He's still there, standing patiently. This time, you realize you should hear what he has to say.";
+                } else {
+                    scene1Text.innerText = "The sun is low as you walk the lonely road. In the distance you see a man standing still gripping a long spear. Something about his posture makes you pause.";
+                }
             }
             
             // Update inventory display whenever scene changes
@@ -985,8 +999,19 @@
             // Reset game state
             hasKey = false;
             acceptedQuest = false;
+            initiallyAvoidedStranger = false;
             updateInventory();
             showScene(0);
+        }
+
+        function returnToStranger() {
+            initiallyAvoidedStranger = true;
+            showScene(1);
+        }
+
+        function avoidStranger() {
+            initiallyAvoidedStranger = true;
+            showScene(8);
         }
 
         // Reset game state completely (for new adventures)
@@ -1050,6 +1075,8 @@
         window.enterCave = enterCave;
         window.lookAround = lookAround;
         window.acceptQuest = acceptQuest;
+        window.returnToStranger = returnToStranger;
+        window.avoidStranger = avoidStranger;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
