@@ -309,7 +309,7 @@
         <!-- Scene 1 -->
         <div id="scene1" class="scene">
             <div class="artwork-container">
-                <img src="SPEARMAN.jpg" alt="A man with a spear in the distance" class="artwork">
+                <img src="SPEARMAN.jpg" alt="A man with a spear in the distance" class="artwork" onclick="handleImageClick(event, 'scene1')" style="cursor: pointer;">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory1"></div>
@@ -332,7 +332,7 @@
                 <div class="inventory-status" id="inventory2"></div>
                 As you draw closer the man's features come into focus. He looks tired but determined. He raises his spear in greeting then asks for your help.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(3)">Accept his request</button>
+                    <button class="choice-btn" onclick="acceptRequest()">Accept his request</button>
                     <button class="choice-btn" onclick="showScene(8)">Say no and continue down the path</button>
                 </div>
             </div>
@@ -341,7 +341,7 @@
         <!-- Scene 3 -->
         <div id="scene3" class="scene">
             <div class="artwork-container">
-                <img src="REWARDKEY.jpg" alt="The man holding a key and a reward" class="artwork">
+                <img src="REWARDKEY.jpg" alt="The man holding a key and a reward" class="artwork" onclick="handleImageClick(event, 'scene3')" style="cursor: pointer;">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory3"></div>
@@ -379,7 +379,7 @@
                 <div class="inventory-status" id="inventory5"></div>
                 As you step inside a shriek pierces the darkness. Goblins leap from the shadows brandishing crude weapons. There is no time to think only to fight.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(6)">FIGHT</button>
+                    <button class="choice-btn" onclick="fightGoblins()">FIGHT</button>
                 </div>
             </div>
         </div>
@@ -406,9 +406,11 @@
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory6"></div>
-                You have successfully defeated the goblins! With a swift strike, you deliver a fatal blow to one while the other flees in terror. The cave is now safe to explore.
+                <span id="scene6-text">
+                    You have successfully defeated the goblins! With a swift strike, you deliver a fatal blow to one while the other flees in terror. The cave is now safe to explore.
+                </span>
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(7)">Explore the cave and find the treasure</button>
+                    <button class="choice-btn" onclick="exploreCave()">Explore the cave and find the treasure</button>
                 </div>
             </div>
         </div>
@@ -416,7 +418,7 @@
         <!-- Scene 7 -->
         <div id="scene7" class="scene">
             <div class="artwork-container">
-                <img src="TREASURE.jpg" alt="Treasure chest of gold" class="artwork">
+                <img src="TREASURE.jpg" alt="Treasure chest of gold" class="artwork" onclick="handleImageClick(event, 'scene7')" style="cursor: pointer;">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory7"></div>
@@ -430,7 +432,7 @@
         <!-- Scene 10 - Pocket Watch Discovery -->
         <div id="scene10" class="scene">
             <div class="artwork-container">
-                <img src="TREASURE.jpg" alt="Pocket watch with photo" class="artwork">
+                <img src="TREASURE.jpg" alt="Pocket watch with photo" class="artwork" onclick="handleImageClick(event, 'scene10')" style="cursor: pointer;">
             </div>
             <div class="textbox">
                 <div class="inventory-status" id="inventory10"></div>
@@ -501,6 +503,9 @@
         let sessionToken = null;
         let connectedWallet = null;
         let initiallyAvoidedStranger = false;
+        let easterEggsFound = [];
+        let secretSequence = [];
+        let goblinClueFound = false;
         
         // Security: Enhanced input sanitization
         function sanitizeInput(input) {
@@ -649,6 +654,7 @@
         function acceptQuest() {
             acceptedQuest = true;
             hasKey = true;
+            checkSecretSequence('accept');
             updateInventory();
             showScene(4);
         }
@@ -949,6 +955,9 @@
                 hasKey = false;
                 acceptedQuest = false;
                 initiallyAvoidedStranger = false;
+                easterEggsFound = [];
+                secretSequence = [];
+                goblinClueFound = false;
             }
             
             // Reset key status when completing the quest (scene 11)
@@ -956,6 +965,9 @@
                 hasKey = false;
                 acceptedQuest = false;
                 initiallyAvoidedStranger = false;
+                easterEggsFound = [];
+                secretSequence = [];
+                goblinClueFound = false;
             }
             
             // Handle Scene 1 dynamic text based on whether player initially avoided stranger
@@ -1000,6 +1012,9 @@
             hasKey = false;
             acceptedQuest = false;
             initiallyAvoidedStranger = false;
+            easterEggsFound = [];
+            secretSequence = [];
+            goblinClueFound = false;
             updateInventory();
             showScene(0);
         }
@@ -1011,7 +1026,113 @@
 
         function avoidStranger() {
             initiallyAvoidedStranger = true;
+            checkSecretSequence('avoid');
             showScene(8);
+        }
+
+        function acceptRequest() {
+            checkSecretSequence('accept');
+            showScene(3);
+        }
+
+        function exploreCave() {
+            checkSecretSequence('explore');
+            
+            // Check for rare goblin clue
+            if (checkGoblinClue()) {
+                const scene6Text = document.getElementById('scene6-text');
+                scene6Text.innerHTML = "You have successfully defeated the goblins! With a swift strike, you deliver a fatal blow to one while the other flees in terror. As you search the area, you notice a small piece of parchment clutched in one of the goblin's hands. It reads: 'The true treasure lies beyond the golden door...' The cave is now safe to explore.";
+            }
+            
+            showScene(7);
+        }
+
+        function fightGoblins() {
+            checkSecretSequence('fight');
+            showScene(6);
+        }
+
+        // Easter Egg Functions
+        function checkSecretSequence(action) {
+            secretSequence.push(action);
+            if (secretSequence.length > 5) {
+                secretSequence.shift(); // Keep only last 5 actions
+            }
+            
+            // Check for secret sequence: approach, accept, look around, fight, explore
+            const targetSequence = ['approach', 'accept', 'look', 'fight', 'explore'];
+            if (secretSequence.join(',') === targetSequence.join(',')) {
+                unlockSecretEnding();
+            }
+        }
+
+        function unlockSecretEnding() {
+            if (!easterEggsFound.includes('secret_ending')) {
+                easterEggsFound.push('secret_ending');
+                alert('🎉 SECRET DISCOVERED! You\'ve unlocked a hidden path! Check the stranger\'s pocket watch more carefully...');
+            }
+        }
+
+        function checkGoblinClue() {
+            // 1 in 50 chance of finding a goblin clue
+            if (Math.floor(Math.random() * 50) === 0 && !goblinClueFound) {
+                goblinClueFound = true;
+                easterEggsFound.push('goblin_clue');
+                return true;
+            }
+            return false;
+        }
+
+        function handleImageClick(event, sceneId) {
+            const rect = event.target.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const width = rect.width;
+            const height = rect.height;
+            
+            // Convert to percentage
+            const xPercent = (x / width) * 100;
+            const yPercent = (y / height) * 100;
+            
+            // Check for easter egg clicks based on scene
+            switch(sceneId) {
+                case 'scene1':
+                    // Click in top-right corner (80-95% x, 5-20% y)
+                    if (xPercent > 80 && xPercent < 95 && yPercent > 5 && yPercent < 20) {
+                        if (!easterEggsFound.includes('hidden_message')) {
+                            easterEggsFound.push('hidden_message');
+                            alert('🔍 You notice something strange about the horizon... A hidden message appears: "The key to the future lies in the past."');
+                        }
+                    }
+                    break;
+                case 'scene3':
+                    // Click on the key area (40-60% x, 30-50% y)
+                    if (xPercent > 40 && xPercent < 60 && yPercent > 30 && yPercent < 50) {
+                        if (!easterEggsFound.includes('key_inspection')) {
+                            easterEggsFound.push('key_inspection');
+                            alert('🔑 You examine the ornate key closely. There are strange markings that seem to glow faintly...');
+                        }
+                    }
+                    break;
+                case 'scene7':
+                    // Click in bottom-left corner (5-20% x, 70-85% y)
+                    if (xPercent > 5 && xPercent < 20 && yPercent > 70 && yPercent < 85) {
+                        if (!easterEggsFound.includes('treasure_secret')) {
+                            easterEggsFound.push('treasure_secret');
+                            alert('💎 You notice a small compartment in the treasure chest. Inside is a map fragment with coordinates: "X: 42, Y: 17"');
+                        }
+                    }
+                    break;
+                case 'scene10':
+                    // Click on the pocket watch (50-70% x, 40-60% y)
+                    if (xPercent > 50 && xPercent < 70 && yPercent > 40 && yPercent < 60) {
+                        if (!easterEggsFound.includes('watch_secret')) {
+                            easterEggsFound.push('watch_secret');
+                            alert('⏰ The pocket watch has a hidden engraving: "To my beloved - our story continues in the next chapter."');
+                        }
+                    }
+                    break;
+            }
         }
 
         // Reset game state completely (for new adventures)
@@ -1037,6 +1158,7 @@
                 return;
             }
             
+            checkSecretSequence('look');
             const extra = document.getElementById('scene4-extra');
             extra.innerHTML = '';
             if (Math.floor(Math.random()*6) === 0) {
@@ -1077,6 +1199,10 @@
         window.acceptQuest = acceptQuest;
         window.returnToStranger = returnToStranger;
         window.avoidStranger = avoidStranger;
+        window.acceptRequest = acceptRequest;
+        window.exploreCave = exploreCave;
+        window.fightGoblins = fightGoblins;
+        window.handleImageClick = handleImageClick;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
