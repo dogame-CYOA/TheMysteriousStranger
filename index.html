@@ -382,6 +382,21 @@
             </div>
         </div>
         
+        <!-- Scene 5.5 - Sneak Attack Opportunity -->
+        <div id="scene5-5" class="scene">
+            <div class="artwork-container">
+                <img src="GOBLIN.jpg" alt="Goblins around campfire" class="artwork">
+            </div>
+            <div class="textbox">
+                <div class="inventory-status" id="inventory5-5"></div>
+                You quietly slip into the cave and see two goblins sitting around a small campfire, eating and talking in their guttural language. They haven't noticed your presence yet.
+                <div class="choices-container">
+                    <button class="choice-btn" onclick="showScene(6)">Launch a sneak attack</button>
+                    <button class="choice-btn" onclick="showScene(5)">Make your presence known</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Scene 6 -->
         <div id="scene6" class="scene">
             <div class="artwork-container">
@@ -433,7 +448,7 @@
                 <div class="inventory-status" id="inventory11"></div>
                 The stranger's eyes light up with joy as you present the pocket watch and return his ornate key. "You found it! This is worth more than all the gold in that cave to me," he exclaims, clutching the watch to his chest.
                 <div class="choices-container">
-                    <button class="choice-btn" onclick="showScene(0)">Return to the beginning</button>
+                    <button class="choice-btn" onclick="showScene(0)">Continue on your journey</button>
                 </div>
             </div>
         </div>
@@ -1000,17 +1015,29 @@
             const extra = document.getElementById('scene4-extra');
             extra.innerHTML = '';
             if (Math.floor(Math.random()*6) === 0) {
+                // Goblins burst through door (1/6 chance)
                 document.getElementById('scene4-text').innerText =
                     "You listen closely and use your key to quietly unlock the door. Suddenly you hear shuffling and guttural whispers on the other side. The door bursts open!";
                 document.getElementById('scene4-choices').style.display = 'none';
                 extra.style.display = '';
                 extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Stand your ground and fight</button> <button class='choice-btn' onclick='showScene(1)'>This is too scary, run back to the stranger</button>`;
             } else {
-                document.getElementById('scene4-text').innerText =
-                    "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door. You decide to go in.";
-                document.getElementById('scene4-choices').style.display = 'none';
-                extra.style.display = '';
-                extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Enter the cave quietly</button>`;
+                // Quiet entry with sneak attack chance (5/6 chance)
+                if (Math.floor(Math.random()*4) === 0) {
+                    // Sneak attack opportunity (1/4 chance)
+                    document.getElementById('scene4-text').innerText =
+                        "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door and slip inside unnoticed.";
+                    document.getElementById('scene4-choices').style.display = 'none';
+                    extra.style.display = '';
+                    extra.innerHTML = `<button class='choice-btn' onclick='showScene(5.5)'>Continue quietly</button>`;
+                } else {
+                    // Normal quiet entry (3/4 chance)
+                    document.getElementById('scene4-text').innerText =
+                        "You look around carefully and listen at the door. All seems quiet. You use your ornate key to unlock the door. You decide to go in.";
+                    document.getElementById('scene4-choices').style.display = 'none';
+                    extra.style.display = '';
+                    extra.innerHTML = `<button class='choice-btn' onclick='showScene(5)'>Enter the cave quietly</button>`;
+                }
             }
         }
 
